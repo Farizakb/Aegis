@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from agent.state import AgentState, TriageResult
+import time
+
+from agent.state import AgentState, NodeUsage, TriageResult
 from stream.schema import IncidentEvent
 
 
@@ -26,6 +28,17 @@ def _prompt(incident: IncidentEvent) -> str:
 
 
 async def triage_node(state: AgentState, llm) -> dict:
-    structured = llm.with_structured_output(TriageResult)
-    result = await structured.ainvoke(_prompt(state["incident"]))
-    return {"triage": result}
+    structured = llm.with_structured_output(TriageResult, include_raw=True)
+    start = time.monotonic()
+    response = await structured.ainvoke(_prompt(state["incident"]))
+    latency_ms = (time.monotonic() - start) * 1000
+
+    usage_metadata = getattr(response["raw"], "usage_metadata", None) or {}
+    usage = NodeUsage(
+        node="triage",
+        model=getattr(llm, "model", "unknown"),
+        input_tokens=usage_metadata.get("input_tokens", 0),
+        output_tokens=usage_metadata.get("output_tokens", 0),
+        latency_ms=latency_ms,
+    )
+    return {"triage": response["parsed"], "usage": state["usage"] + [usage]}

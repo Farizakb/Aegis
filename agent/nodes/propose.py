@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from agent.state import AgentState, ProposedFix
+import time
+
+from agent.state import AgentState, NodeUsage, ProposedFix
 
 CONTEXT_CHAR_LIMIT = 4000
 
@@ -27,6 +29,17 @@ def _prompt(state: AgentState) -> str:
 
 
 async def propose_node(state: AgentState, llm) -> dict:
-    structured = llm.with_structured_output(ProposedFix)
-    result = await structured.ainvoke(_prompt(state))
-    return {"proposed_fix": result}
+    structured = llm.with_structured_output(ProposedFix, include_raw=True)
+    start = time.monotonic()
+    response = await structured.ainvoke(_prompt(state))
+    latency_ms = (time.monotonic() - start) * 1000
+
+    usage_metadata = getattr(response["raw"], "usage_metadata", None) or {}
+    usage = NodeUsage(
+        node="propose",
+        model=getattr(llm, "model", "unknown"),
+        input_tokens=usage_metadata.get("input_tokens", 0),
+        output_tokens=usage_metadata.get("output_tokens", 0),
+        latency_ms=latency_ms,
+    )
+    return {"proposed_fix": response["parsed"], "usage": state["usage"] + [usage]}

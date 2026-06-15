@@ -12,7 +12,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from redis.asyncio import Redis
 
 from agent.graph import build_graph
-from agent.llm import get_llm
+from agent.llm import get_propose_llm, get_triage_llm
 from agent.state import AgentState
 from stream.consumer import INCIDENTS_STREAM
 from stream.schema import IncidentEvent
@@ -50,6 +50,19 @@ def _print_result(incident: IncidentEvent, result: AgentState) -> None:
     print(f"  target_file: {fix.target_file}")
     print(f"  {fix.description}")
     print(fix.patch)
+    print()
+
+    print("Usage")
+    total_input = total_output = 0
+    for usage in result["usage"]:
+        print(
+            f"  {usage.node:<8} {usage.model:<28} "
+            f"in={usage.input_tokens:>5} out={usage.output_tokens:>5} "
+            f"latency={usage.latency_ms:.0f}ms"
+        )
+        total_input += usage.input_tokens
+        total_output += usage.output_tokens
+    print(f"  total tokens: in={total_input} out={total_output}")
 
 
 async def main(count: int = 1) -> None:
@@ -76,11 +89,21 @@ async def main(count: int = 1) -> None:
     tools = await client.get_tools()
     search_tool = next(t for t in tools if t.name == "search_knowledge")
 
-    graph = build_graph(get_llm(), search_tool)
+    graph = build_graph(get_triage_llm(), get_propose_llm(), search_tool)
 
     for incident in incidents:
         result = await graph.ainvoke(
-            {"incident": incident, "triage": None, "retrieved_context": [], "proposed_fix": None}
+            {
+                "incident": incident,
+                "triage": None,
+                "retrieved_context": [],
+                "proposed_fix": None,
+                "retries": 0,
+                "sandbox_result": None,
+                "policy_verdict": None,
+                "hitl_decision": None,
+                "usage": [],
+            }
         )
         _print_result(incident, result)
 

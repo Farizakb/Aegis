@@ -35,22 +35,29 @@ def make_incident() -> IncidentEvent:
     )
 
 
+class FakeRaw:
+    def __init__(self, usage_metadata: dict):
+        self.usage_metadata = usage_metadata
+
+
 class FakeStructuredLLM:
-    def __init__(self, result):
+    def __init__(self, result, usage_metadata: dict | None = None):
         self._result = result
+        self._usage_metadata = usage_metadata or {"input_tokens": 100, "output_tokens": 20}
         self.last_prompt = None
 
     async def ainvoke(self, prompt):
         self.last_prompt = prompt
-        return self._result
+        return {"raw": FakeRaw(self._usage_metadata), "parsed": self._result}
 
 
 class FakeLLM:
-    def __init__(self, results: dict[type, object]):
+    def __init__(self, results: dict[type, object], model: str = "fake-model"):
         self._results = results
+        self.model = model
         self.structured: dict[type, FakeStructuredLLM] = {}
 
-    def with_structured_output(self, model):
+    def with_structured_output(self, model, include_raw=False):
         structured = FakeStructuredLLM(self._results[model])
         self.structured[model] = structured
         return structured
@@ -73,13 +80,29 @@ async def test_triage_node_returns_triage_result():
         confidence=0.9,
         reasoning="rss grows linearly with each tick",
     )
-    llm = FakeLLM({TriageResult: triage_result})
-    state = {"incident": make_incident(), "triage": None, "retrieved_context": [], "proposed_fix": None}
+    llm = FakeLLM({TriageResult: triage_result}, model="claude-haiku-4-5-20251001")
+    state = {
+        "incident": make_incident(),
+        "triage": None,
+        "retrieved_context": [],
+        "proposed_fix": None,
+        "retries": 0,
+        "sandbox_result": None,
+        "policy_verdict": None,
+        "hitl_decision": None,
+        "usage": [],
+    }
 
     result = await triage_node(state, llm)
 
-    assert result["triage"] is triage_result
+    assert result["triage"] == triage_result
     assert "memory_leak" in llm.structured[TriageResult].last_prompt
+    assert len(result["usage"]) == 1
+    usage = result["usage"][0]
+    assert usage.node == "triage"
+    assert usage.model == "claude-haiku-4-5-20251001"
+    assert usage.input_tokens == 100
+    assert usage.output_tokens == 20
 
 
 async def test_retrieve_node_uses_triage_root_cause_in_query():
@@ -90,7 +113,17 @@ async def test_retrieve_node_uses_triage_root_cause_in_query():
         reasoning="...",
     )
     search_tool = FakeSearchTool([{"source": "runbook:memory_leak.md", "content": "...", "score": 0.8}])
-    state = {"incident": make_incident(), "triage": triage_result, "retrieved_context": [], "proposed_fix": None}
+    state = {
+        "incident": make_incident(),
+        "triage": triage_result,
+        "retrieved_context": [],
+        "proposed_fix": None,
+        "retries": 0,
+        "sandbox_result": None,
+        "policy_verdict": None,
+        "hitl_decision": None,
+        "usage": [],
+    }
 
     result = await retrieve_node(state, search_tool)
 
@@ -105,7 +138,7 @@ async def test_propose_node_returns_proposed_fix():
         patch="--- a/mock_app/faults/memory_leak.py\n+++ b/mock_app/faults/memory_leak.py\n",
         target_file="mock_app/faults/memory_leak.py",
     )
-    llm = FakeLLM({ProposedFix: proposed_fix})
+    llm = FakeLLM({ProposedFix: proposed_fix}, model="claude-sonnet-4-6")
     triage_result = TriageResult(
         fault_kind=FaultKind.memory_leak,
         root_cause="unbounded list growth",
@@ -113,11 +146,25 @@ async def test_propose_node_returns_proposed_fix():
         reasoning="...",
     )
     retrieved = [RetrievedChunk(source="runbook:memory_leak.md", content="cap the chunk list", score=0.8)]
-    state = {"incident": make_incident(), "triage": triage_result, "retrieved_context": retrieved, "proposed_fix": None}
+    state = {
+        "incident": make_incident(),
+        "triage": triage_result,
+        "retrieved_context": retrieved,
+        "proposed_fix": None,
+        "retries": 0,
+        "sandbox_result": None,
+        "policy_verdict": None,
+        "hitl_decision": None,
+        "usage": [],
+    }
 
     result = await propose_node(state, llm)
 
-    assert result["proposed_fix"] is proposed_fix
+    assert result["proposed_fix"] == proposed_fix
     prompt = llm.structured[ProposedFix].last_prompt
     assert "unbounded list growth" in prompt
     assert "cap the chunk list" in prompt
+    assert len(result["usage"]) == 1
+    usage = result["usage"][0]
+    assert usage.node == "propose"
+    assert usage.model == "claude-sonnet-4-6"

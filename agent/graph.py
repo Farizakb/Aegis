@@ -13,11 +13,11 @@ from agent.nodes.triage import triage_node
 from agent.state import AgentState
 
 
-def build_graph(llm, search_tool) -> CompiledStateGraph:
+def build_graph(triage_llm, propose_llm, search_tool) -> CompiledStateGraph:
     graph = StateGraph(AgentState)
-    graph.add_node("triage", partial(triage_node, llm=llm))
+    graph.add_node("triage", partial(triage_node, llm=triage_llm))
     graph.add_node("retrieve", partial(retrieve_node, search_tool=search_tool))
-    graph.add_node("propose", partial(propose_node, llm=llm))
+    graph.add_node("propose", partial(propose_node, llm=propose_llm))
 
     graph.add_edge(START, "triage")
     graph.add_edge("triage", "retrieve")

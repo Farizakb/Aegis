@@ -76,7 +76,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aegis}
       POSTGRES_DB: ${POSTGRES_DB:-aegis}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5-20250929}
+      TRIAGE_MODEL: ${TRIAGE_MODEL:-claude-haiku-4-5-20251001}
+      PROPOSE_MODEL: ${PROPOSE_MODEL:-claude-sonnet-4-6}
     depends_on:
       redis:
         condition: service_healthy

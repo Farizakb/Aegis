@@ -39,11 +39,22 @@ async def test_graph_runs_triage_then_retrieve_then_propose():
     llm = FakeLLM({TriageResult: triage_result, ProposedFix: proposed_fix})
     search_tool = FakeSearchTool([{"source": "runbook:memory_leak.md", "content": "cap the chunk list", "score": 0.8}])
 
-    graph = build_graph(llm, search_tool)
+    graph = build_graph(llm, llm, search_tool)
     result = await graph.ainvoke(
-        {"incident": make_incident(), "triage": None, "retrieved_context": [], "proposed_fix": None}
+        {
+            "incident": make_incident(),
+            "triage": None,
+            "retrieved_context": [],
+            "proposed_fix": None,
+            "retries": 0,
+            "sandbox_result": None,
+            "policy_verdict": None,
+            "hitl_decision": None,
+            "usage": [],
+        }
     )
 
     assert result["triage"] == triage_result
     assert result["retrieved_context"][0].source == "runbook:memory_leak.md"
     assert result["proposed_fix"] == proposed_fix
+    assert [u.node for u in result["usage"]] == ["triage", "propose"]

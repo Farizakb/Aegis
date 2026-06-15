@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from agent.state import ProposedFix, RetrievedChunk, TriageResult
+from agent.state import NodeUsage, ProposedFix, RetrievedChunk, TriageResult
 from stream.schema import FaultKind, IncidentEvent, Severity
 
 
@@ -60,3 +60,15 @@ def test_retrieved_chunk_and_proposed_fix_roundtrip():
 def test_incident_event_is_the_agent_input():
     incident = make_incident()
     assert incident.fault_kind == FaultKind.memory_leak
+
+
+def test_node_usage_validates():
+    usage = NodeUsage(
+        node="triage",
+        model="claude-haiku-4-5-20251001",
+        input_tokens=120,
+        output_tokens=40,
+        latency_ms=850.5,
+    )
+    assert usage.node == "triage"
+    assert usage.input_tokens == 120

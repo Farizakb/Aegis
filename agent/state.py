@@ -28,8 +28,21 @@ class ProposedFix(BaseModel):
     target_file: str | None = None
 
 
+class NodeUsage(BaseModel):
+    node: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    latency_ms: float
+
+
 class AgentState(TypedDict):
     incident: IncidentEvent
     triage: TriageResult | None
     retrieved_context: list[RetrievedChunk]
     proposed_fix: ProposedFix | None
+    retries: int
+    sandbox_result: dict | None
+    policy_verdict: dict | None
+    hitl_decision: dict | None
+    usage: list[NodeUsage]
