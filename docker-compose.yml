@@ -1,0 +1,57 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aegis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aegis}
+      POSTGRES_DB: ${POSTGRES_DB:-aegis}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aegis}"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  app:
+    build: .
+    command: uvicorn mock_app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      EMIT_INTERVAL_S: ${EMIT_INTERVAL_S:-0.5}
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  consumer:
+    build: .
+    command: python -m stream.consumer
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CONSUMER_NAME: ${CONSUMER_NAME:-c1}
+      CONSUMER_BATCH: ${CONSUMER_BATCH:-10}
+      CONSUMER_BLOCK_MS: ${CONSUMER_BLOCK_MS:-500}
+      PENDING_HIGH_WATER: ${PENDING_HIGH_WATER:-100}
+      DEDUP_TTL_S: ${DEDUP_TTL_S:-5}
+      IDLE_GAP_S: ${IDLE_GAP_S:-3}
+      MAX_WINDOW_S: ${MAX_WINDOW_S:-30}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:

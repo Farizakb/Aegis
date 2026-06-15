@@ -1,0 +1,24 @@
+# ==============================================================================
+# Claude Code Exclusions
+# ==============================================================================
+
+# Ignore massive framework caches & logs to save context tokens
+.langchain/
+.langgraph/
+.crewai/
+*.log
+ghost-cache/
+
+# Block AI access to strict credentials
+.env
+secrets.toml
+*.key
+
+# Exclude local build artifacts and heavy assets
+dist/
+build/
+node_modules/
+assets/media/
+
+# Prevent Claude from reading its own local config files
+.claude/settings.local.json

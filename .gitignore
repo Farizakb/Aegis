@@ -1,0 +1,77 @@
+# ==============================================================================
+# AI Agents & LLM Frameworks
+# ==============================================================================
+# Agent logs, execution traces, and telemetry
+.langchain/
+.langgraph/
+.autogen/
+.crewai/
+.llama_index/
+.phoenix/
+langchain.log
+agent_run.log
+
+# Claude Code / local agent data
+*.local.md
+
+# Project spec / hand-off brief — kept local only (portfolio repo privacy)
+CLAUDE.md
+
+# AI Tooling & Editors (Local configs / guidelines)
+.cursorignore
+.cursor_mcp.json
+.codeiumignore
+.aiexclude
+
+# ==============================================================================
+# API Keys & Sensitive Data
+# ==============================================================================
+# Contains OPENAI_API_KEY, ANTHROPIC_API_KEY, database credentials, etc.
+.env
+.env.local
+.env.*.local
+*.env
+secrets.toml
+
+# ==============================================================================
+# Vector Databases & Embeddings Cache
+# ==============================================================================
+# Local vector indexes, knowledge bases, and document storage caches
+.chroma/
+chroma.sqlite3
+.pinecone/
+.qdrant/
+faiss_index/
+.milvus/
+__pycache__/
+.cache/
+
+# Document ingestion folders (untracked source data)
+data/raw/
+data/inputs/
+documents/
+
+# ==============================================================================
+# Python / Node Virtual Environments
+# ==============================================================================
+# Dependency directories
+venv/
+.venv/
+env/
+env.bak/
+node_modules/
+
+# ==============================================================================
+# Python build artifacts
+# ==============================================================================
+*.egg-info/
+build/
+dist/
+
+# ==============================================================================
+# Operating System & IDEs
+# ==============================================================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
