@@ -5,6 +5,9 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY mock_app ./mock_app
 COPY stream ./stream
+COPY agent ./agent
+COPY retrieval ./retrieval
+COPY tools ./tools
 
 RUN pip install --no-cache-dir .
 
