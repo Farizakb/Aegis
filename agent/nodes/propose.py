@@ -6,16 +6,18 @@ import time
 
 from agent.state import AgentState, NodeUsage, ProposedFix
 
-CONTEXT_CHAR_LIMIT = 4000
+CHUNK_CHAR_LIMIT = 1200
+MIN_RELEVANCE_SCORE = 0.3
 
 
 def _prompt(state: AgentState) -> str:
     incident = state["incident"]
     triage = state["triage"]
 
+    relevant_chunks = [c for c in state["retrieved_context"] if c.score >= MIN_RELEVANCE_SCORE]
     context_text = "\n\n".join(
-        f"[{c.source} score={c.score:.2f}]\n{c.content}" for c in state["retrieved_context"]
-    )[:CONTEXT_CHAR_LIMIT]
+        f"[{c.source} score={c.score:.2f}]\n{c.content[:CHUNK_CHAR_LIMIT]}" for c in relevant_chunks
+    )
 
     return (
         "You are an SRE remediation assistant. Given the incident, triage, and retrieved "

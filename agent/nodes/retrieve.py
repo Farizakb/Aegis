@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from agent.state import AgentState, RetrievedChunk
 
-TOP_K = 5
+TOP_K = 3
 
 
 async def retrieve_node(state: AgentState, search_tool) -> dict:

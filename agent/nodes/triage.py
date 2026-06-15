@@ -7,10 +7,13 @@ import time
 from agent.state import AgentState, NodeUsage, TriageResult
 from stream.schema import IncidentEvent
 
+MAX_SAMPLE_EVENTS = 5
+
 
 def _prompt(incident: IncidentEvent) -> str:
     samples = "\n".join(
-        f"- [{e.severity.value}] {e.message} (metric={e.metric})" for e in incident.sample_events
+        f"- [{e.severity.value}] {e.message} (metric={e.metric})"
+        for e in incident.sample_events[:MAX_SAMPLE_EVENTS]
     )
     return (
         "You are an SRE triage assistant. Analyze the following incident and identify the "
