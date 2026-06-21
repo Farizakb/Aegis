@@ -126,7 +126,7 @@ class Correlator:
             event_count=window.event_count,
             duplicate_count=window.duplicate_count,
             sample_events=window.sample_events,
-            correlation_window_s=self._idle_gap_s,
+            correlation_window_s=(window.last_seen - window.first_seen).total_seconds(),
         )
 
 

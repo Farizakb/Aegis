@@ -6,6 +6,7 @@ from typing import TypedDict
 
 from pydantic import BaseModel, Field
 
+from retrieval.models import RetrievedChunk
 from stream.schema import FaultKind, IncidentEvent
 
 
@@ -14,12 +15,6 @@ class TriageResult(BaseModel):
     root_cause: str
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str
-
-
-class RetrievedChunk(BaseModel):
-    source: str
-    content: str
-    score: float
 
 
 class ProposedFix(BaseModel):

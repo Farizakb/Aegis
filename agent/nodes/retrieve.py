@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from agent.state import AgentState, RetrievedChunk
+from agent.state import AgentState
+from retrieval.models import RetrievedChunk
 
 TOP_K = 3
 

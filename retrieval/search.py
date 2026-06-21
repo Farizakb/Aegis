@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pgvector import Vector
 
-from agent.state import RetrievedChunk
+from retrieval.models import RetrievedChunk
 from retrieval.embeddings import embed_texts
 
 
