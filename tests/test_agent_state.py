@@ -72,3 +72,47 @@ def test_node_usage_validates():
     )
     assert usage.node == "triage"
     assert usage.input_tokens == 120
+
+
+def test_sandbox_result_validates():
+    from agent.state import SandboxResult
+
+    r = SandboxResult(passed=True, exit_code=0, stdout="1 passed", stderr="", duration_ms=1200.0)
+    assert r.passed is True
+    assert r.exit_code == 0
+
+
+def test_policy_verdict_validates():
+    from agent.state import PolicyDecision, PolicyVerdict
+
+    v = PolicyVerdict(
+        decision=PolicyDecision.needs_approval,
+        violated_rules=["blast_radius"],
+        reasons=["target outside auto-approved paths"],
+    )
+    assert v.decision == PolicyDecision.needs_approval
+    assert len(v.violated_rules) == 1
+
+
+def test_hitl_decision_validates():
+    from agent.state import HitlChoice, HitlDecision
+
+    d = HitlDecision(choice=HitlChoice.approve, decided_by="local-ui", note="looks good")
+    assert d.choice == HitlChoice.approve
+
+
+def test_incident_report_validates():
+    from agent.state import Outcome, IncidentReport
+
+    r = IncidentReport(
+        incident_id="inc-1",
+        fault_kind=FaultKind.memory_leak,
+        outcome=Outcome.applied,
+        retries=1,
+        sandbox_passed=True,
+        total_input_tokens=500,
+        total_output_tokens=100,
+        total_latency_ms=3200.0,
+    )
+    assert r.outcome == Outcome.applied
+    assert r.retries == 1

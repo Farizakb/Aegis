@@ -50,6 +50,7 @@ async def test_graph_runs_triage_then_retrieve_then_propose():
             "sandbox_result": None,
             "policy_verdict": None,
             "hitl_decision": None,
+            "report": None,
             "usage": [],
         }
     )

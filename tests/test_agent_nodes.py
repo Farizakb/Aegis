@@ -90,6 +90,7 @@ async def test_triage_node_returns_triage_result():
         "sandbox_result": None,
         "policy_verdict": None,
         "hitl_decision": None,
+        "report": None,
         "usage": [],
     }
 
@@ -122,6 +123,7 @@ async def test_retrieve_node_uses_triage_root_cause_in_query():
         "sandbox_result": None,
         "policy_verdict": None,
         "hitl_decision": None,
+        "report": None,
         "usage": [],
     }
 
@@ -155,6 +157,7 @@ async def test_propose_node_returns_proposed_fix():
         "sandbox_result": None,
         "policy_verdict": None,
         "hitl_decision": None,
+        "report": None,
         "usage": [],
     }
 
