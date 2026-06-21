@@ -16,7 +16,7 @@ agent_run.log
 
 # Project spec / hand-off brief — kept local only (portfolio repo privacy)
 CLAUDE.md
-
+docs
 # AI Tooling & Editors (Local configs / guidelines)
 .cursorignore
 .cursor_mcp.json
