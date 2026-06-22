@@ -44,4 +44,5 @@ async def propose_node(state: AgentState, llm) -> dict:
         output_tokens=usage_metadata.get("output_tokens", 0),
         latency_ms=latency_ms,
     )
-    return {"proposed_fix": response["parsed"], "usage": state["usage"] + [usage]}
+    retries = state["retries"] + (1 if state.get("sandbox_result") else 0)
+    return {"proposed_fix": response["parsed"], "usage": state["usage"] + [usage], "retries": retries}
