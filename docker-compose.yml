@@ -78,6 +78,11 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       TRIAGE_MODEL: ${TRIAGE_MODEL:-claude-haiku-4-5-20251001}
       PROPOSE_MODEL: ${PROPOSE_MODEL:-claude-sonnet-4-6}
+      HITL_PORT: "8001"
+    ports:
+      - "8001:8001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       redis:
         condition: service_healthy
