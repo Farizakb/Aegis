@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class ActionType(str, Enum):
@@ -52,7 +52,7 @@ class ProposedAction(BaseModel):
     patch: str | None = None
     target_file: str | None = None
     flag_name: str | None = None
-    workers: int | None = None
+    workers: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def _require_action_params(self) -> "ProposedAction":
@@ -60,6 +60,6 @@ class ProposedAction(BaseModel):
             raise ValueError("patch_code requires patch and target_file")
         if self.action is ActionType.toggle_feature_flag and not self.flag_name:
             raise ValueError("toggle_feature_flag requires flag_name")
-        if self.action is ActionType.scale_out and not self.workers:
+        if self.action is ActionType.scale_out and self.workers is None:
             raise ValueError("scale_out requires workers")
         return self

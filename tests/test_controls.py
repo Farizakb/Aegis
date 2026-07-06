@@ -28,6 +28,15 @@ def test_scale_defaults_and_bounds():
         scale.set_workers(17)
 
 
+def test_scale_env_misconfig_clamped_not_crashing(monkeypatch):
+    monkeypatch.setenv("WORKERS", "0")
+    assert ScaleState().workers == 1
+    monkeypatch.setenv("WORKERS", "99")
+    assert ScaleState().workers == 16
+    monkeypatch.setenv("WORKERS", "not-a-number")
+    assert ScaleState().workers == 2
+
+
 def test_flags_endpoints(client):
     assert client.get("/flags").json() == {RISKY_FLAG: False}
     resp = client.post(f"/flags/{RISKY_FLAG}", json={"enabled": True})

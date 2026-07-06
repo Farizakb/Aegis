@@ -27,7 +27,15 @@ class FeatureFlags:
 
 class ScaleState:
     def __init__(self, workers: int | None = None) -> None:
-        self.workers = workers if workers is not None else int(os.environ.get("WORKERS", "2"))
+        if workers is None:
+            # A misconfigured WORKERS env var must not crash the app at import
+            # or divide-by-zero the traffic_surge latency model.
+            try:
+                workers = int(os.environ.get("WORKERS", "2"))
+            except ValueError:
+                workers = 2
+            workers = min(max(workers, MIN_WORKERS), MAX_WORKERS)
+        self.workers = workers
 
     def set_workers(self, n: int) -> None:
         if not MIN_WORKERS <= n <= MAX_WORKERS:
