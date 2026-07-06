@@ -32,6 +32,11 @@ class DbDeadlockFault(Fault):
     def is_active(self) -> bool:
         return self._active
 
+    def metric_snapshot(self) -> dict[str, float]:
+        if not self._active:
+            return {}
+        return {"lock_wait_ms": float(BASE_LOCK_WAIT_MS + self._tick * LOCK_WAIT_STEP_MS)}
+
     async def emit_signals(self, producer: Producer) -> None:
         if not self._active:
             return

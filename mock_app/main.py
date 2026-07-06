@@ -7,7 +7,9 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, HTTPException, Response
+from pydantic import BaseModel, Field
 
+from mock_app.controls import FLAGS, SCALE
 from mock_app.faults import FAULTS, Fault
 from mock_app.faults.error_spike import ErrorSpikeFault
 from stream.producer import Producer
@@ -75,9 +77,50 @@ def _get_fault(kind: str) -> tuple[FaultKind, Fault]:
 app.include_router(router)
 
 
+class FlagUpdate(BaseModel):
+    enabled: bool
+
+
+class ScaleUpdate(BaseModel):
+    workers: int = Field(ge=1, le=16)
+
+
+@app.get("/flags")
+async def list_flags():
+    return FLAGS.all()
+
+
+@app.post("/flags/{name}")
+async def set_flag(name: str, body: FlagUpdate):
+    try:
+        FLAGS.set(name, body.enabled)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"unknown flag: {name}")
+    return {"name": name, "enabled": body.enabled}
+
+
+@app.get("/scale")
+async def get_scale():
+    return {"workers": SCALE.workers}
+
+
+@app.post("/scale")
+async def set_scale(body: ScaleUpdate):
+    SCALE.set_workers(body.workers)
+    return {"workers": SCALE.workers}
+
+
 @app.get("/healthz")
 async def healthz():
-    return {"status": "ok"}
+    metrics: dict[str, float] = {}
+    for fault in FAULTS.values():
+        metrics.update(fault.metric_snapshot())
+    return {
+        "status": "ok",
+        "workers": SCALE.workers,
+        "flags": FLAGS.all(),
+        "metrics": metrics,
+    }
 
 
 @app.get("/work")

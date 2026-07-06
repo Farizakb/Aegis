@@ -12,6 +12,17 @@ class FaultKind(str, Enum):
     memory_leak = "memory_leak"
     db_deadlock = "db_deadlock"
     error_spike = "error_spike"
+    traffic_surge = "traffic_surge"
+
+
+# ADR-0002: faults the sandbox can replay empirically. Non-reproducible fault
+# classes (e.g. upstream latency, CPU steal) would be absent here and must be
+# routed through HITL/escalate by policy. All v1 faults are reproducible.
+_REPRODUCIBLE: frozenset[FaultKind] = frozenset(FaultKind)
+
+
+def is_reproducible(kind: FaultKind) -> bool:
+    return kind in _REPRODUCIBLE
 
 
 class Severity(str, Enum):

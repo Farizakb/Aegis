@@ -108,3 +108,88 @@ async def test_error_spike_emits_error_rate_metric():
     event = producer.published[0]
     assert event.fault_kind == FaultKind.error_spike
     assert event.metric is not None
+
+
+from mock_app.controls import FLAGS, RISKY_FLAG
+
+
+async def test_error_spike_trigger_enables_flag():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    assert FLAGS.is_enabled(RISKY_FLAG) is True
+    await fault.clear()
+    assert FLAGS.is_enabled(RISKY_FLAG) is False
+
+
+async def test_error_spike_flag_off_stops_failures_while_active():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    FLAGS.set(RISKY_FLAG, False)  # the kill switch
+
+    results = [fault.should_fail() for _ in range(30)]
+
+    assert fault.is_active() is True          # fault not cleared...
+    assert not any(results)                    # ...but symptom is gone
+
+
+async def test_error_rate_decays_after_flag_off():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    for _ in range(10):
+        fault.should_fail()                    # flag on: some failures counted
+    errors_before = fault._errors
+
+    FLAGS.set(RISKY_FLAG, False)
+    for _ in range(90):
+        fault.should_fail()                    # still counted in total, no new errors
+
+    assert fault._errors == errors_before
+    assert fault._total == 100                 # rate decayed from ~50% toward ~errors/100
+
+
+from mock_app.controls import SCALE
+from mock_app.faults.traffic_surge import TrafficSurgeFault
+from stream.schema import is_reproducible
+
+
+async def test_traffic_surge_latency_scales_inversely_with_workers():
+    fault = TrafficSurgeFault()
+    await fault.trigger()
+
+    SCALE.set_workers(2)
+    assert fault.latency_ms == 200.0   # 50 * 8 / 2 — degraded
+
+    SCALE.set_workers(8)
+    assert fault.latency_ms == 50.0    # 50 * 8 / 8 — recovered
+
+
+async def test_traffic_surge_emits_error_when_degraded():
+    fault = TrafficSurgeFault()
+    producer = FakeProducer()
+    SCALE.set_workers(2)
+
+    await fault.trigger()
+    await fault.emit_signals(producer)
+
+    assert len(producer.published) == 1
+    event = producer.published[0]
+    assert event.fault_kind == FaultKind.traffic_surge
+    assert event.severity == Severity.error
+    assert event.metric == 200.0
+
+
+async def test_traffic_surge_inactive_emits_nothing():
+    fault = TrafficSurgeFault()
+    producer = FakeProducer()
+    await fault.emit_signals(producer)
+    assert producer.published == []
+
+
+def test_all_v1_faults_are_reproducible():
+    assert all(is_reproducible(kind) for kind in FaultKind)
+
+
+def test_traffic_surge_registered(client):
+    data = client.get("/faults").json()
+    assert "traffic_surge" in data
+    assert data["traffic_surge"] is False

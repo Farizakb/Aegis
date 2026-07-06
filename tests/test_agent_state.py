@@ -116,3 +116,23 @@ def test_incident_report_validates():
     )
     assert r.outcome == Outcome.applied
     assert r.retries == 1
+
+
+from agent.actions import ActionType, ProposedAction
+from agent.state import RemediationPlan
+
+
+def test_remediation_plan_mitigation_only():
+    plan = RemediationPlan(
+        mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"))
+    assert plan.durable_fix is None
+
+
+def test_remediation_plan_with_durable_fix():
+    plan = RemediationPlan(
+        mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"),
+        durable_fix=ProposedAction(
+            action=ActionType.patch_code, reason="fix the leak",
+            patch="--- a/x\n+++ b/x\n", target_file="mock_app/faults/memory_leak.py"),
+    )
+    assert plan.durable_fix.action is ActionType.patch_code
