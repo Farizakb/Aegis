@@ -1,4 +1,4 @@
-"""Error spike: GET /work genuinely returns 5xx for a fraction of requests while active."""
+"""Error spike: flag-tied — GET /work returns real 5xx while the risky feature flag is on."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import random
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from mock_app.controls import FLAGS, RISKY_FLAG
 from mock_app.faults.base import SOURCE, Fault, make_dedup_key
 from stream.producer import Producer
 from stream.schema import FaultKind, RawEvent, Severity
@@ -26,20 +27,24 @@ class ErrorSpikeFault(Fault):
         self._active = True
         self._total = 0
         self._errors = 0
+        FLAGS.set(RISKY_FLAG, True)
 
     async def clear(self) -> None:
         self._active = False
         self._total = 0
         self._errors = 0
+        FLAGS.set(RISKY_FLAG, False)
 
     def is_active(self) -> bool:
         return self._active
 
     def should_fail(self) -> bool:
-        """Called by GET /work to decide whether to return a real 500."""
+        """Called by GET /work; 500s only while the risky feature flag is on."""
         if not self._active:
             return False
         self._total += 1
+        if not FLAGS.is_enabled(RISKY_FLAG):
+            return False
         fail = random.random() < ERROR_RATE
         if fail:
             self._errors += 1

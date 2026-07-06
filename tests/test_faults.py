@@ -108,3 +108,40 @@ async def test_error_spike_emits_error_rate_metric():
     event = producer.published[0]
     assert event.fault_kind == FaultKind.error_spike
     assert event.metric is not None
+
+
+from mock_app.controls import FLAGS, RISKY_FLAG
+
+
+async def test_error_spike_trigger_enables_flag():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    assert FLAGS.is_enabled(RISKY_FLAG) is True
+    await fault.clear()
+    assert FLAGS.is_enabled(RISKY_FLAG) is False
+
+
+async def test_error_spike_flag_off_stops_failures_while_active():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    FLAGS.set(RISKY_FLAG, False)  # the kill switch
+
+    results = [fault.should_fail() for _ in range(30)]
+
+    assert fault.is_active() is True          # fault not cleared...
+    assert not any(results)                    # ...but symptom is gone
+
+
+async def test_error_rate_decays_after_flag_off():
+    fault = ErrorSpikeFault()
+    await fault.trigger()
+    for _ in range(10):
+        fault.should_fail()                    # flag on: some failures counted
+    errors_before = fault._errors
+
+    FLAGS.set(RISKY_FLAG, False)
+    for _ in range(90):
+        fault.should_fail()                    # still counted in total, no new errors
+
+    assert fault._errors == errors_before
+    assert fault._total == 100                 # rate decayed from ~50% toward ~errors/100
