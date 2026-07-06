@@ -112,7 +112,15 @@ async def set_scale(body: ScaleUpdate):
 
 @app.get("/healthz")
 async def healthz():
-    return {"status": "ok"}
+    metrics: dict[str, float] = {}
+    for fault in FAULTS.values():
+        metrics.update(fault.metric_snapshot())
+    return {
+        "status": "ok",
+        "workers": SCALE.workers,
+        "flags": FLAGS.all(),
+        "metrics": metrics,
+    }
 
 
 @app.get("/work")

@@ -50,6 +50,12 @@ class ErrorSpikeFault(Fault):
             self._errors += 1
         return fail
 
+    def metric_snapshot(self) -> dict[str, float]:
+        if not self._active:
+            return {}
+        rate = (self._errors / self._total * 100) if self._total else 0.0
+        return {"error_rate_pct": rate}
+
     async def emit_signals(self, producer: Producer) -> None:
         if not self._active or self._total == 0:
             return

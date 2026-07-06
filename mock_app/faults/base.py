@@ -35,3 +35,7 @@ class Fault(ABC):
     @abstractmethod
     async def emit_signals(self, producer: Producer) -> None:
         """Called periodically while active; publishes RawEvents reflecting current state."""
+
+    def metric_snapshot(self) -> dict[str, float]:
+        """App-reported metrics for /healthz; empty when the fault is inactive."""
+        return {}

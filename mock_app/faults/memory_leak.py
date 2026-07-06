@@ -31,6 +31,11 @@ class MemoryLeakFault(Fault):
     def is_active(self) -> bool:
         return self._active
 
+    def metric_snapshot(self) -> dict[str, float]:
+        if not self._active:
+            return {}
+        return {"rss_mb": float(len(self._chunks) * CHUNK_SIZE_MB)}
+
     async def emit_signals(self, producer: Producer) -> None:
         if not self._active:
             return

@@ -38,6 +38,11 @@ class TrafficSurgeFault(Fault):
             return BASE_LATENCY_MS
         return BASE_LATENCY_MS * LOAD_UNITS / SCALE.workers
 
+    def metric_snapshot(self) -> dict[str, float]:
+        if not self._active:
+            return {}
+        return {"latency_ms": self.latency_ms}
+
     async def emit_signals(self, producer: Producer) -> None:
         if not self._active:
             return
