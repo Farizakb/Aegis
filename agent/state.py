@@ -7,6 +7,7 @@ from typing import TypedDict
 
 from pydantic import BaseModel, Field
 
+from agent.actions import ProposedAction
 from retrieval.models import RetrievedChunk
 from stream.schema import FaultKind, IncidentEvent
 
@@ -22,6 +23,13 @@ class ProposedFix(BaseModel):
     description: str
     patch: str
     target_file: str | None = None
+
+
+class RemediationPlan(BaseModel):
+    """Mitigate-first plan: mitigation executes now, durable_fix is filed as follow-up (ADR-0003)."""
+
+    mitigation: ProposedAction
+    durable_fix: ProposedAction | None = None
 
 
 class NodeUsage(BaseModel):
