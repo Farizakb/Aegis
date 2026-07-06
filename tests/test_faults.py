@@ -145,3 +145,51 @@ async def test_error_rate_decays_after_flag_off():
 
     assert fault._errors == errors_before
     assert fault._total == 100                 # rate decayed from ~50% toward ~errors/100
+
+
+from mock_app.controls import SCALE
+from mock_app.faults.traffic_surge import TrafficSurgeFault
+from stream.schema import is_reproducible
+
+
+async def test_traffic_surge_latency_scales_inversely_with_workers():
+    fault = TrafficSurgeFault()
+    await fault.trigger()
+
+    SCALE.set_workers(2)
+    assert fault.latency_ms == 200.0   # 50 * 8 / 2 — degraded
+
+    SCALE.set_workers(8)
+    assert fault.latency_ms == 50.0    # 50 * 8 / 8 — recovered
+
+
+async def test_traffic_surge_emits_error_when_degraded():
+    fault = TrafficSurgeFault()
+    producer = FakeProducer()
+    SCALE.set_workers(2)
+
+    await fault.trigger()
+    await fault.emit_signals(producer)
+
+    assert len(producer.published) == 1
+    event = producer.published[0]
+    assert event.fault_kind == FaultKind.traffic_surge
+    assert event.severity == Severity.error
+    assert event.metric == 200.0
+
+
+async def test_traffic_surge_inactive_emits_nothing():
+    fault = TrafficSurgeFault()
+    producer = FakeProducer()
+    await fault.emit_signals(producer)
+    assert producer.published == []
+
+
+def test_all_v1_faults_are_reproducible():
+    assert all(is_reproducible(kind) for kind in FaultKind)
+
+
+def test_traffic_surge_registered(client):
+    data = client.get("/faults").json()
+    assert "traffic_surge" in data
+    assert data["traffic_surge"] is False
