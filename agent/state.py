@@ -46,6 +46,10 @@ class SandboxResult(BaseModel):
     stdout: str
     stderr: str
     duration_ms: float
+    # Phase 2 (ADR-0002): empirical fault-replay evidence for the HITL brief
+    before_metrics: dict[str, float] | None = None
+    after_metrics: dict[str, float] | None = None
+    failure_reason: str | None = None
 
 
 class PolicyDecision(str, Enum):
