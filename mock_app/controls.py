@@ -9,6 +9,12 @@ MIN_WORKERS = 1
 MAX_WORKERS = 16
 
 
+def app_version() -> str:
+    """Deploy version this process simulates; 'previous' = the rollback target,
+    i.e. the release before the bad deploy that introduced db_deadlock/error_spike."""
+    return os.environ.get("APP_VERSION", "current")
+
+
 class FeatureFlags:
     def __init__(self, defaults: dict[str, bool] | None = None) -> None:
         self._flags: dict[str, bool] = dict(defaults or {RISKY_FLAG: False})

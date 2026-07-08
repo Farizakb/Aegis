@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from mock_app.controls import FLAGS, RISKY_FLAG
+from mock_app.controls import FLAGS, RISKY_FLAG, app_version
 from mock_app.faults.base import SOURCE, Fault, make_dedup_key
 from stream.producer import Producer
 from stream.schema import FaultKind, RawEvent, Severity
@@ -24,6 +24,8 @@ class ErrorSpikeFault(Fault):
         self._errors = 0
 
     async def trigger(self) -> None:
+        if app_version() == "previous":
+            return  # the risky feature shipped in the last deploy
         self._active = True
         self._total = 0
         self._errors = 0
