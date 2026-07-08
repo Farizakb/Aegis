@@ -122,7 +122,11 @@ class SandboxExecutor:
             mem_limit="512m",
             labels={SANDBOX_LABEL: "1"},
         )
-        return container, self._wait_ready(container)
+        try:
+            return container, self._wait_ready(container)
+        except Exception:
+            container.remove(force=True)
+            raise
 
     def _wait_ready(self, container) -> str:
         deadline = time.monotonic() + READY_TIMEOUT_S
