@@ -165,6 +165,17 @@ class SandboxExecutor:
     def _apply_action(self, container, base_url: str, action: ProposedAction):
         if action.action is ActionType.restart_service:
             return self._restart(container)
+        if action.action is ActionType.scale_out:
+            httpx.post(
+                f"{base_url}/scale", json={"workers": action.workers}, timeout=10
+            ).raise_for_status()
+            return container, base_url
+        if action.action is ActionType.toggle_feature_flag:
+            # v1 semantics: toggling is always the kill switch — flag OFF
+            httpx.post(
+                f"{base_url}/flags/{action.flag_name}", json={"enabled": False}, timeout=10
+            ).raise_for_status()
+            return container, base_url
         raise ValueError(f"sandbox cannot verify action: {action.action.value}")
 
     def _restart(self, container):

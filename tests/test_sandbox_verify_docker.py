@@ -79,3 +79,28 @@ async def test_no_sandbox_containers_leak(executor):
     await executor.verify(RESTART, FaultKind.memory_leak)
     leftovers = _CLIENT.containers.list(all=True, filters={"label": "aegis-sandbox"})
     assert leftovers == []
+
+
+async def test_scale_out_fixes_traffic_surge(executor):
+    action = ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=8)
+    result = await executor.verify(action, FaultKind.traffic_surge)
+    assert result.passed is True
+    assert result.before_metrics["latency_ms"] == 200.0
+    assert result.after_metrics["latency_ms"] == 50.0
+
+
+async def test_scale_out_does_not_fix_memory_leak(executor):
+    action = ProposedAction(action=ActionType.scale_out, reason="more workers", workers=8)
+    result = await executor.verify(action, FaultKind.memory_leak)
+    assert result.passed is False
+    assert result.after_metrics["rss_mb"] > result.before_metrics["rss_mb"]  # kept leaking
+
+
+async def test_flag_kill_switch_decays_error_spike(executor):
+    action = ProposedAction(
+        action=ActionType.toggle_feature_flag, reason="kill switch", flag_name="risky_feature"
+    )
+    result = await executor.verify(action, FaultKind.error_spike)
+    assert result.passed is True
+    assert result.before_metrics["error_rate_pct"] >= 30.0
+    assert result.after_metrics["error_rate_pct"] <= 25.0  # decayed, fault still active
