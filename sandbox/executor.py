@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import httpx
+from docker.errors import NotFound
 
 from agent.actions import ActionType, ProposedAction
 from agent.state import SandboxResult
@@ -106,7 +107,13 @@ class SandboxExecutor:
                                  duration_ms=duration_ms, failure_reason=str(exc))
         finally:
             if container is not None:
-                container.remove(force=True)
+                self._safe_remove(container)
+
+    def _safe_remove(self, container) -> None:
+        try:
+            container.remove(force=True)
+        except NotFound:
+            pass  # already gone (e.g. rollback removed it before a failed recreate)
 
     def _start_app(self, env_overrides: dict[str, str]):
         env = {
@@ -125,7 +132,7 @@ class SandboxExecutor:
         try:
             return container, self._wait_ready(container)
         except Exception:
-            container.remove(force=True)
+            self._safe_remove(container)
             raise
 
     def _wait_ready(self, container) -> str:

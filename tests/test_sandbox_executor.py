@@ -38,3 +38,22 @@ def test_start_app_removes_container_when_never_ready(monkeypatch):
         ex._start_app({})
 
     assert fake.removed_with is True  # created container was force-removed, not orphaned
+
+
+class GoneContainer:
+    def remove(self, force=False):
+        from docker.errors import NotFound
+
+        raise NotFound("container already removed")
+
+
+def test_safe_remove_tolerates_already_removed_container():
+    ex = SandboxExecutor(object())
+    ex._safe_remove(GoneContainer())  # must not raise
+
+
+def test_safe_remove_still_force_removes_live_container():
+    fake = FakeContainer()
+    ex = SandboxExecutor(object())
+    ex._safe_remove(fake)
+    assert fake.removed_with is True
