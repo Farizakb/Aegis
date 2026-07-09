@@ -176,6 +176,9 @@ class SandboxExecutor:
                 f"{base_url}/flags/{action.flag_name}", json={"enabled": False}, timeout=10
             ).raise_for_status()
             return container, base_url
+        if action.action is ActionType.rollback:
+            container.remove(force=True)
+            return self._start_app({"APP_VERSION": "previous"})
         raise ValueError(f"sandbox cannot verify action: {action.action.value}")
 
     def _restart(self, container):

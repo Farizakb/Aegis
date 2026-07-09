@@ -104,3 +104,31 @@ async def test_flag_kill_switch_decays_error_spike(executor):
     assert result.passed is True
     assert result.before_metrics["error_rate_pct"] >= 30.0
     assert result.after_metrics["error_rate_pct"] <= 25.0  # decayed, fault still active
+
+
+ROLLBACK = ProposedAction(action=ActionType.rollback, reason="revert last deploy")
+
+
+async def test_rollback_fixes_db_deadlock(executor):
+    result = await executor.verify(ROLLBACK, FaultKind.db_deadlock)
+    assert result.passed is True
+    assert result.before_metrics["lock_wait_ms"] >= 500.0
+    assert result.after_metrics.get("lock_wait_ms", 0.0) <= 100.0  # bad query gone
+
+
+async def test_rollback_fixes_error_spike(executor):
+    result = await executor.verify(ROLLBACK, FaultKind.error_spike)
+    assert result.passed is True
+    assert result.after_metrics.get("error_rate_pct", 0.0) <= 25.0
+
+
+async def test_rollback_does_not_fix_memory_leak(executor):
+    result = await executor.verify(ROLLBACK, FaultKind.memory_leak)
+    assert result.passed is False  # latent bug predates the last deploy — leak reproduces
+    assert result.after_metrics["rss_mb"] > 10.0
+
+
+async def test_no_containers_leak_after_rollback(executor):
+    await executor.verify(ROLLBACK, FaultKind.db_deadlock)
+    leftovers = _CLIENT.containers.list(all=True, filters={"label": "aegis-sandbox"})
+    assert leftovers == []
