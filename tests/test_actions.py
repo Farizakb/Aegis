@@ -54,3 +54,11 @@ def test_scale_out_rejects_non_positive_workers():
     for bad in (0, -5):
         with pytest.raises(ValidationError):
             ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=bad)
+
+
+def test_scale_out_rejects_workers_above_cap():
+    for bad in (17, 999):
+        with pytest.raises(ValidationError):
+            ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=bad)
+    pa = ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=16)
+    assert pa.workers == 16

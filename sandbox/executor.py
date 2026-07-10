@@ -148,7 +148,7 @@ class SandboxExecutor:
             self._app_image,
             detach=True,
             environment=env,
-            ports={"8000/tcp": None},   # ephemeral host port
+            ports={"8000/tcp": ("127.0.0.1", None)},   # ephemeral, loopback-only
             mem_limit="512m",
             labels={SANDBOX_LABEL: "1"},
         )

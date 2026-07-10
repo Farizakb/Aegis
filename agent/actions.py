@@ -52,7 +52,7 @@ class ProposedAction(BaseModel):
     patch: str | None = None
     target_file: str | None = None
     flag_name: str | None = None
-    workers: int | None = Field(default=None, ge=1)
+    workers: int | None = Field(default=None, ge=1, le=16)
 
     @model_validator(mode="after")
     def _require_action_params(self) -> "ProposedAction":
