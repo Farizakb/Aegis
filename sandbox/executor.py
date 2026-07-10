@@ -91,6 +91,8 @@ class SandboxExecutor:
     def _verify_sync(self, action: ProposedAction, fault_kind: FaultKind) -> SandboxResult:
         start = time.monotonic()
         container = None
+        before = None
+        after = None
         try:
             container, base_url = self._start_app({})
             self._trigger(base_url, fault_kind)
@@ -122,7 +124,8 @@ class SandboxExecutor:
         except Exception as exc:
             duration_ms = (time.monotonic() - start) * 1000
             return SandboxResult(passed=False, exit_code=1, stdout="", stderr=str(exc),
-                                 duration_ms=duration_ms, failure_reason=str(exc))
+                                 duration_ms=duration_ms, failure_reason=str(exc),
+                                 before_metrics=before, after_metrics=after)
         finally:
             if container is not None:
                 self._safe_remove(container)
@@ -132,6 +135,8 @@ class SandboxExecutor:
             container.remove(force=True)
         except NotFound:
             pass  # already gone (e.g. rollback removed it before a failed recreate)
+        except Exception:
+            pass  # never let cleanup clobber an already-constructed SandboxResult
 
     def _start_app(self, env_overrides: dict[str, str]):
         env = {
@@ -215,6 +220,9 @@ class SandboxExecutor:
 
     def _copy_patched_file(self, container, action: ProposedAction) -> None:
         repo_root = Path(__file__).resolve().parents[1]
+        candidate = (repo_root / action.target_file).resolve()
+        if Path(action.target_file).is_absolute() or not candidate.is_relative_to(repo_root):
+            raise ValueError(f"target_file escapes repository root: {action.target_file}")
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / action.target_file
             dest.parent.mkdir(parents=True, exist_ok=True)
