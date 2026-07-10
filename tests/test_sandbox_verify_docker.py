@@ -134,6 +134,13 @@ async def test_no_containers_leak_after_rollback(executor):
     assert leftovers == []
 
 
+# tests/fixtures/memory_leak_cap.patch caps the leak at MAX_CHUNKS = 2: after
+# patch + restart + re-trigger, rss plateaus at MAX_CHUNKS * CHUNK_SIZE_MB
+# (mock_app/faults/memory_leak.py) = 2 * 5.0 = 10.0 MB — exactly the 10.0
+# recovery ceiling in sandbox/recovery.py (3 chunks = 15.0 would sit at the
+# degraded floor and fail recovery; the before-phase floor is met by the
+# UNPATCHED code, ~15 ticks x 5 MB). Change CHUNK_SIZE_MB or the 10.0/15.0
+# thresholds and the fixture must be revisited.
 def _patch_action(fixture: str) -> ProposedAction:
     patch = (REPO_ROOT / "tests" / "fixtures" / fixture).read_text()
     return ProposedAction(

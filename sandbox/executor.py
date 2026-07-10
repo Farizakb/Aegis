@@ -99,6 +99,9 @@ class SandboxExecutor:
             if not check_degraded(fault_kind, before):
                 return self._result(False, before, None, "fault did not reproduce", start)
 
+            # Pytest gate runs BEFORE _apply_action deliberately: a failing gate
+            # short-circuits without ever touching the replay container, at the
+            # cost of the faulted app container idling for the gate's duration.
             pytest_stdout = ""
             if action.action is ActionType.patch_code:
                 gate = self._run_sync(action.patch, action.target_file)
