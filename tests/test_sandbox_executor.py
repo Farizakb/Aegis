@@ -1,7 +1,17 @@
 import pytest
 
 import sandbox.executor as executor_module
+from agent.actions import ActionType, ProposedAction
 from sandbox.executor import SandboxExecutor
+
+UNAPPLICABLE_PATCH = """\
+diff --git a/mock_app/main.py b/mock_app/main.py
+--- a/mock_app/main.py
++++ b/mock_app/main.py
+@@ -1,1 +1,1 @@
+-this exact line does not exist in target file
++replacement line
+"""
 
 
 class FakeContainer:
@@ -57,3 +67,14 @@ def test_safe_remove_still_force_removes_live_container():
     ex = SandboxExecutor(object())
     ex._safe_remove(fake)
     assert fake.removed_with is True
+
+
+def test_copy_patched_file_surfaces_git_apply_stderr():
+    ex = SandboxExecutor(object())  # git apply fails before any docker/container call
+    action = ProposedAction(
+        action=ActionType.patch_code, reason="bogus patch",
+        patch=UNAPPLICABLE_PATCH, target_file="mock_app/main.py",
+    )
+
+    with pytest.raises(Exception, match="patch does not apply"):
+        ex._copy_patched_file(container=object(), action=action)

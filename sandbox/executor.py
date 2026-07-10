@@ -217,8 +217,14 @@ class SandboxExecutor:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes((repo_root / action.target_file).read_bytes())
             (Path(tmp) / "action.patch").write_text(action.patch, encoding="utf-8", newline="")
-            subprocess.run(["git", "apply", "action.patch"], cwd=tmp,
-                           check=True, capture_output=True)
+            try:
+                subprocess.run(["git", "apply", "action.patch"], cwd=tmp,
+                               check=True, capture_output=True)
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or b"").decode(errors="replace").strip()
+                raise RuntimeError(
+                    f"git apply failed for {action.target_file}: {stderr}"
+                ) from exc
             buf = io.BytesIO()
             with tarfile.open(fileobj=buf, mode="w") as tar:
                 tar.add(dest, arcname=action.target_file)
