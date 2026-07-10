@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import subprocess
+import tarfile
 import tempfile
 import time
 from pathlib import Path
 
 import httpx
 from docker.errors import NotFound
+from docker.types import LogConfig
 
 from agent.actions import ActionType, ProposedAction
 from agent.state import SandboxResult
@@ -39,7 +43,8 @@ class SandboxExecutor:
         return await asyncio.to_thread(self._run_sync, patch, target_file)
 
     def _run_sync(self, patch: str, target_file: str) -> SandboxResult:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".diff", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".diff", delete=False,
+                                         encoding="utf-8", newline="") as f:
             f.write(patch)
             patch_path = f.name
 
@@ -53,6 +58,7 @@ class SandboxExecutor:
                 network_disabled=True,
                 mem_limit="256m",
                 detach=True,
+                log_config=LogConfig(type=LogConfig.types.JSON),
             )
             result = container.wait(timeout=self._timeout_s)
             exit_code = result["StatusCode"]
@@ -93,6 +99,14 @@ class SandboxExecutor:
             if not check_degraded(fault_kind, before):
                 return self._result(False, before, None, "fault did not reproduce", start)
 
+            pytest_stdout = ""
+            if action.action is ActionType.patch_code:
+                gate = self._run_sync(action.patch, action.target_file)
+                pytest_stdout = gate.stdout
+                if not gate.passed:
+                    return self._result(False, before, None, "pytest gate failed",
+                                        start, pytest_stdout=pytest_stdout)
+
             container, base_url = self._apply_action(container, base_url, action)
             if should_retrigger(action.action, fault_kind):
                 self._trigger(base_url, fault_kind, allow_conflict=True)
@@ -100,7 +114,8 @@ class SandboxExecutor:
             after = self._metrics(base_url)
 
             passed, reason = check_recovered(fault_kind, before, after)
-            return self._result(passed, before, after, None if passed else reason, start)
+            return self._result(passed, before, after, None if passed else reason, start,
+                                pytest_stdout=pytest_stdout)
         except Exception as exc:
             duration_ms = (time.monotonic() - start) * 1000
             return SandboxResult(passed=False, exit_code=1, stdout="", stderr=str(exc),
@@ -186,11 +201,29 @@ class SandboxExecutor:
         if action.action is ActionType.rollback:
             container.remove(force=True)
             return self._start_app({"APP_VERSION": "previous"})
+        if action.action is ActionType.patch_code:
+            self._copy_patched_file(container, action)
+            return self._restart(container)
         raise ValueError(f"sandbox cannot verify action: {action.action.value}")
 
     def _restart(self, container):
         container.restart(timeout=5)
         return container, self._wait_ready(container)  # ephemeral port may change
+
+    def _copy_patched_file(self, container, action: ProposedAction) -> None:
+        repo_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / action.target_file
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes((repo_root / action.target_file).read_bytes())
+            (Path(tmp) / "action.patch").write_text(action.patch, encoding="utf-8", newline="")
+            subprocess.run(["git", "apply", "action.patch"], cwd=tmp,
+                           check=True, capture_output=True)
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                tar.add(dest, arcname=action.target_file)
+            buf.seek(0)
+            container.put_archive("/app", buf.getvalue())
 
     def _result(self, passed: bool, before, after, failure_reason: str | None,
                 start: float, pytest_stdout: str = "") -> SandboxResult:

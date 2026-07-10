@@ -132,3 +132,34 @@ async def test_no_containers_leak_after_rollback(executor):
     await executor.verify(ROLLBACK, FaultKind.db_deadlock)
     leftovers = _CLIENT.containers.list(all=True, filters={"label": "aegis-sandbox"})
     assert leftovers == []
+
+
+def _patch_action(fixture: str) -> ProposedAction:
+    patch = (REPO_ROOT / "tests" / "fixtures" / fixture).read_text()
+    return ProposedAction(
+        action=ActionType.patch_code, reason="cap the leaked buffer",
+        patch=patch, target_file="mock_app/faults/memory_leak.py",
+    )
+
+
+@pytest.fixture(scope="session")
+def sandbox_image():
+    _CLIENT.images.build(path=str(REPO_ROOT), dockerfile="sandbox/Dockerfile",
+                         tag="aegis-sandbox:latest")
+    return "aegis-sandbox:latest"
+
+
+async def test_patch_fixes_memory_leak_durably(executor, sandbox_image):
+    result = await executor.verify(_patch_action("memory_leak_cap.patch"), FaultKind.memory_leak)
+    assert result.passed is True
+    assert result.before_metrics["rss_mb"] >= 15.0
+    # re-triggered after the patched restart: the leak cannot recur
+    assert result.after_metrics["rss_mb"] <= 10.0
+    assert "passed" in result.stdout  # pytest gate output is part of the evidence
+
+
+async def test_patch_failing_tests_is_rejected(executor, sandbox_image):
+    result = await executor.verify(_patch_action("memory_leak_broken.patch"), FaultKind.memory_leak)
+    assert result.passed is False
+    assert result.failure_reason == "pytest gate failed"
+    assert result.after_metrics is None  # never applied to the replay container
