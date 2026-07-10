@@ -1,0 +1,8 @@
+.venv
+.git
+.pytest_cache
+.claude
+.superpowers
+__pycache__
+*.pyc
+evals/results
