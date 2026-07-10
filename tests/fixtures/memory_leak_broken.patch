@@ -1,0 +1,13 @@
+diff --git a/mock_app/faults/memory_leak.py b/mock_app/faults/memory_leak.py
+index bbd0fc1..a3384fe 100644
+--- a/mock_app/faults/memory_leak.py
++++ b/mock_app/faults/memory_leak.py
+@@ -9,7 +9,7 @@ from mock_app.faults.base import SOURCE, Fault, make_dedup_key
+ from stream.producer import Producer
+ from stream.schema import FaultKind, RawEvent, Severity
+ 
+-CHUNK_SIZE_MB = 5
++CHUNK_SIZE_MB = 7
+ CRITICAL_THRESHOLD_MB = 150
+ BUCKET_SIZE_MB = 50
+ 

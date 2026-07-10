@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from mock_app.controls import app_version
 from mock_app.faults.base import SOURCE, Fault, make_dedup_key
 from stream.producer import Producer
 from stream.schema import FaultKind, RawEvent, Severity
@@ -22,6 +23,8 @@ class DbDeadlockFault(Fault):
         self._tick = 0
 
     async def trigger(self) -> None:
+        if app_version() == "previous":
+            return  # the deadlock-causing query shipped in the last deploy
         self._active = True
         self._tick = 0
 

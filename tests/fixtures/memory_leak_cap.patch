@@ -1,0 +1,22 @@
+diff --git a/mock_app/faults/memory_leak.py b/mock_app/faults/memory_leak.py
+index bbd0fc1..b0815bd 100644
+--- a/mock_app/faults/memory_leak.py
++++ b/mock_app/faults/memory_leak.py
+@@ -10,6 +10,7 @@ from stream.producer import Producer
+ from stream.schema import FaultKind, RawEvent, Severity
+ 
+ CHUNK_SIZE_MB = 5
++MAX_CHUNKS = 2
+ CRITICAL_THRESHOLD_MB = 150
+ BUCKET_SIZE_MB = 50
+ 
+@@ -40,7 +41,8 @@ class MemoryLeakFault(Fault):
+         if not self._active:
+             return
+ 
+-        self._chunks.append(bytes(CHUNK_SIZE_MB * 1024 * 1024))
++        if len(self._chunks) < MAX_CHUNKS:
++            self._chunks.append(bytes(CHUNK_SIZE_MB * 1024 * 1024))
+         rss_mb = len(self._chunks) * CHUNK_SIZE_MB
+         severity = Severity.critical if rss_mb >= CRITICAL_THRESHOLD_MB else Severity.warning
+         bucketed = (rss_mb // BUCKET_SIZE_MB) * BUCKET_SIZE_MB

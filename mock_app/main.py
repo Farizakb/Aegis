@@ -27,8 +27,24 @@ async def _emit_loop(producer: Producer) -> None:
                 await fault.emit_signals(producer)
 
 
+class NullProducer:
+    """Stream-disabled mode (sandbox containers): emit loop ticks, nothing is published."""
+
+    async def publish(self, event) -> None:
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if os.environ.get("AEGIS_STREAM_DISABLED") == "1":
+        app.state.producer = NullProducer()
+        task = asyncio.create_task(_emit_loop(app.state.producer))
+        try:
+            yield
+        finally:
+            task.cancel()
+        return
+
     from redis.asyncio import Redis
 
     redis = Redis.from_url(REDIS_URL)
@@ -56,7 +72,7 @@ async def trigger_fault(kind: str):
     if fault.is_active():
         raise HTTPException(status_code=409, detail=f"{fault_kind.value} is already active")
     await fault.trigger()
-    return {"kind": fault_kind.value, "active": True}
+    return {"kind": fault_kind.value, "active": fault.is_active()}
 
 
 @router.post("/{kind}/clear")

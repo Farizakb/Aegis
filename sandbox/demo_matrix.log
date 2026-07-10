@@ -1,0 +1,49 @@
+﻿
+=== memory_leak + restart_service: PASS (7.6s)
+  before: {'rss_mb': 90.0}
+  after:  {}
+
+=== memory_leak + scale_out: FAIL (5.7s)
+  before: {'rss_mb': 90.0}
+  after:  {'rss_mb': 195.0}
+  reason: rss_mb 195.0 above recovery ceiling 10.0 (before: 90.0)
+
+=== memory_leak + rollback: FAIL (10.1s)
+  before: {'rss_mb': 110.0}
+  after:  {'rss_mb': 100.0}
+  reason: rss_mb 100.0 above recovery ceiling 10.0 (before: 110.0)
+
+=== memory_leak + patch_code: PASS (14.5s)
+  before: {'rss_mb': 95.0}
+  after:  {'rss_mb': 10.0}
+
+=== db_deadlock + restart_service: PASS (7.4s)
+  before: {'lock_wait_ms': 2400.0}
+  after:  {}
+
+=== db_deadlock + rollback: PASS (10.0s)
+  before: {'lock_wait_ms': 2600.0}
+  after:  {}
+
+=== error_spike + restart_service: FAIL (91.2s)
+  before: {'error_rate_pct': 52.5}
+  after:  {'error_rate_pct': 47.5}
+  reason: error_rate_pct 47.5 above recovery ceiling 25.0 (before: 52.5)
+
+=== error_spike + toggle_feature_flag: PASS (81.1s)
+  before: {'error_rate_pct': 52.5}
+  after:  {'error_rate_pct': 13.125}
+
+=== traffic_surge + restart_service: FAIL (6.3s)
+  before: {'latency_ms': 200.0}
+  after:  {'latency_ms': 200.0}
+  reason: latency_ms 200.0 above recovery ceiling 100.0 (before: 200.0)
+
+=== traffic_surge + scale_out: PASS (3.2s)
+  before: {'latency_ms': 200.0}
+  after:  {'latency_ms': 50.0}
+
+10/10 outcomes match the truth matrix
+EXIT:0
+
+
