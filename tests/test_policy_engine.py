@@ -155,3 +155,65 @@ def test_all_violated_rules_are_listed():
         "patch_protected_path", "patch_size_cap",
     }
     assert len(verdict.reasons) == len(verdict.violated_rules)
+
+
+# Rule 5 — flap protection (stateful)
+def test_third_restart_within_cooldown_is_blocked():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    for _ in range(2):
+        engine.record_apply(_restart(), PolicyDecision.allow)
+        now["t"] += 60.0
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+    assert "flap_protection" in verdict.violated_rules
+
+
+def test_flap_window_expires():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    for _ in range(2):
+        engine.record_apply(_restart(), PolicyDecision.allow)
+    now["t"] += 601.0  # both applies age out of the 600s window
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.allow
+
+
+def test_flap_is_per_action_and_target():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    for _ in range(2):
+        engine.record_apply(_restart(), PolicyDecision.allow)
+    scale = ProposedAction(action=ActionType.scale_out, reason="surge", workers=8)
+    verdict = engine.evaluate(proposal=scale, sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.allow  # different action, same target
+
+
+# Rule 6 — rate-limit circuit (stateful, system-wide)
+def test_circuit_opens_after_max_auto_applies():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    actions = [ActionType.restart_service, ActionType.scale_out, ActionType.toggle_feature_flag]
+    for i in range(5):
+        a = actions[i % 3]
+        kwargs = {"workers": 4} if a is ActionType.scale_out else {}
+        kwargs |= {"flag_name": "risky"} if a is ActionType.toggle_feature_flag else {}
+        engine.record_apply(ProposedAction(action=a, reason="x", target=f"svc-{i}", **kwargs),
+                            PolicyDecision.allow)
+        now["t"] += 10.0
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "rate_limit" in verdict.violated_rules
+
+
+def test_needs_approval_applies_do_not_count_toward_circuit():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    scale = ProposedAction(action=ActionType.scale_out, reason="surge", workers=8)
+    for i in range(5):
+        engine.record_apply(
+            ProposedAction(action=ActionType.scale_out, reason="x", target=f"svc-{i}", workers=4),
+            PolicyDecision.needs_approval,
+        )
+    verdict = engine.evaluate(proposal=scale, sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.allow

@@ -116,12 +116,36 @@ class PolicyEngine:
             out.append(("patch_size_cap", f"patch exceeds {MAX_PATCH_LINES} lines", PolicyDecision.needs_approval))
         return out
 
-    # Stateful rules — implemented in Task 3; inert stubs keep Task 2 green.
     def _flap_violations(self, proposal: ProposedAction) -> list[tuple[str, str, PolicyDecision]]:
+        cutoff = self._clock() - FLAP_WINDOW_S
+        while self._applies and self._applies[0][2] < cutoff:
+            self._applies.popleft()
+        key = (proposal.action.value, proposal.target)
+        count = sum(1 for a, t, _ in self._applies if (a, t) == key)
+        if count >= FLAP_MAX_APPLIES:
+            return [(
+                "flap_protection",
+                f"{proposal.action.value} on {proposal.target!r} applied "
+                f"{count}x within {int(FLAP_WINDOW_S)}s cooldown",
+                PolicyDecision.block,
+            )]
         return []
 
     def _rate_violations(self) -> list[tuple[str, str, PolicyDecision]]:
+        cutoff = self._clock() - RATE_WINDOW_S
+        while self._auto_applies and self._auto_applies[0] < cutoff:
+            self._auto_applies.popleft()
+        if len(self._auto_applies) >= RATE_MAX_AUTO_APPLIES:
+            return [(
+                "rate_limit",
+                f"circuit open: {len(self._auto_applies)} auto-applies within "
+                f"{int(RATE_WINDOW_S)}s (max {RATE_MAX_AUTO_APPLIES})",
+                PolicyDecision.needs_approval,
+            )]
         return []
 
     def record_apply(self, proposal: ProposedAction, decision: PolicyDecision) -> None:
-        return None
+        now = self._clock()
+        self._applies.append((proposal.action.value, proposal.target, now))
+        if decision is PolicyDecision.allow:
+            self._auto_applies.append(now)
