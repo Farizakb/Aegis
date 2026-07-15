@@ -1,43 +1,157 @@
+"""Per-rule unit tests for the 7-rule deny-by-default policy engine (ADR-0004)."""
+
 import pytest
 
-from agent.state import PolicyDecision, ProposedFix
+from agent.actions import ActionType, ProposedAction
+from agent.state import PolicyDecision, SandboxResult, TriageResult
 from policy.engine import PolicyEngine
+from stream.schema import FaultKind
 
 
-@pytest.fixture
-def engine():
-    return PolicyEngine()
+def _engine(now=1000.0):
+    return PolicyEngine(clock=lambda: now)
 
 
-def _fix(target_file: str, patch_lines: int = 5) -> ProposedFix:
-    patch = "\n".join([f"+line{i}" for i in range(patch_lines)])
-    return ProposedFix(description="fix", patch=patch, target_file=target_file)
+def _triage(confidence=0.9):
+    return TriageResult(
+        fault_kind=FaultKind.memory_leak, root_cause="leak",
+        confidence=confidence, reasoning="test",
+    )
 
 
-def test_allow_when_target_in_mock_app(engine):
-    verdict = engine.evaluate(fix=_fix("mock_app/faults/memory_leak.py"), triage=None, incident=None)
-    assert verdict.decision == PolicyDecision.allow
+def _sandbox(passed=True):
+    return SandboxResult(
+        passed=passed, exit_code=0 if passed else 1, stdout="", stderr="",
+        duration_ms=1.0, before_metrics={"rss_mb": 80.0},
+        after_metrics={"rss_mb": 0.0},
+    )
+
+
+def _restart():
+    return ProposedAction(action=ActionType.restart_service, reason="leak")
+
+
+# Rule 1 — deny-by-default
+def test_unknown_action_type_is_blocked():
+    verdict = _engine().evaluate(
+        proposal={"action": "delete_database", "reason": "??"},
+        sandbox=None, triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.block
+    assert verdict.violated_rules == ["deny_by_default"]
+
+
+def test_malformed_proposal_missing_params_is_blocked():
+    # patch_code without patch/target_file fails catalog validation -> block
+    verdict = _engine().evaluate(
+        proposal={"action": "patch_code", "reason": "fix"},
+        sandbox=_sandbox(), triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.block
+    assert "deny_by_default" in verdict.violated_rules
+
+
+def test_valid_dict_proposal_is_coerced_and_evaluated():
+    verdict = _engine().evaluate(
+        proposal={"action": "restart_service", "reason": "leak"},
+        sandbox=_sandbox(), triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.allow
+
+
+# Escalate — deliberate safe terminal (ledger carry-in)
+def test_escalate_is_allowed_without_sandbox_proof():
+    verdict = _engine().evaluate(
+        proposal=ProposedAction(action=ActionType.escalate, reason="stuck"),
+        sandbox=None, triage=None,
+    )
+    assert verdict.decision is PolicyDecision.allow
     assert verdict.violated_rules == []
 
 
-def test_needs_approval_when_target_outside_mock_app(engine):
-    verdict = engine.evaluate(fix=_fix("tests/conftest.py"), triage=None, incident=None)
-    assert verdict.decision == PolicyDecision.needs_approval
-    assert "blast_radius" in verdict.violated_rules
+# Rule 2 — sandbox proof required
+def test_no_sandbox_result_caps_at_needs_approval():
+    verdict = _engine().evaluate(proposal=_restart(), sandbox=None, triage=_triage())
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "sandbox_proof_required" in verdict.violated_rules
 
 
-def test_block_when_target_is_protected(engine):
-    verdict = engine.evaluate(fix=_fix("agent/graph.py"), triage=None, incident=None)
-    assert verdict.decision == PolicyDecision.block
-    assert "protected_path" in verdict.violated_rules
+def test_failed_sandbox_caps_at_needs_approval():
+    verdict = _engine().evaluate(
+        proposal=_restart(), sandbox=_sandbox(passed=False), triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "sandbox_proof_required" in verdict.violated_rules
 
 
-def test_needs_approval_when_patch_too_large(engine):
-    verdict = engine.evaluate(fix=_fix("mock_app/main.py", patch_lines=100), triage=None, incident=None)
-    assert verdict.decision == PolicyDecision.needs_approval
-    assert "patch_size" in verdict.violated_rules
+def test_passing_sandbox_high_confidence_restart_is_allowed():
+    verdict = _engine().evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.allow
+    assert verdict.violated_rules == []
 
 
-def test_block_takes_precedence_over_needs_approval(engine):
-    verdict = engine.evaluate(fix=_fix("policy/engine.py", patch_lines=100), triage=None, incident=None)
-    assert verdict.decision == PolicyDecision.block
+# Rule 3 — irreversibility gate
+def test_patch_code_always_needs_approval_even_with_proof():
+    proposal = ProposedAction(
+        action=ActionType.patch_code, reason="fix",
+        patch="--- a\n+++ b\n", target_file="mock_app/faults/memory_leak.py",
+    )
+    verdict = _engine().evaluate(proposal=proposal, sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "irreversibility_gate" in verdict.violated_rules
+
+
+# Rule 4 — confidence floor
+def test_low_confidence_needs_approval():
+    verdict = _engine().evaluate(
+        proposal=_restart(), sandbox=_sandbox(), triage=_triage(confidence=0.5),
+    )
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "confidence_floor" in verdict.violated_rules
+
+
+def test_missing_triage_is_treated_as_low_confidence():
+    verdict = _engine().evaluate(proposal=_restart(), sandbox=_sandbox(), triage=None)
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "confidence_floor" in verdict.violated_rules
+
+
+# Rule 7 — patch rules
+def _patch(target_file, lines=3):
+    return ProposedAction(
+        action=ActionType.patch_code, reason="fix",
+        patch="x\n" * lines, target_file=target_file,
+    )
+
+
+def test_patch_outside_allowlist_needs_approval():
+    verdict = _engine().evaluate(proposal=_patch("tests/conftest.py"),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.needs_approval
+    assert "patch_path_allowlist" in verdict.violated_rules
+
+
+def test_patch_to_protected_path_is_blocked():
+    verdict = _engine().evaluate(proposal=_patch("policy/engine.py"),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+    assert "patch_protected_path" in verdict.violated_rules
+
+
+def test_oversized_patch_needs_approval():
+    verdict = _engine().evaluate(proposal=_patch("mock_app/main.py", lines=100),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert "patch_size_cap" in verdict.violated_rules
+
+
+# Aggregation — all violations reported, worst decision wins
+def test_all_violated_rules_are_listed():
+    verdict = _engine().evaluate(
+        proposal=_patch("policy/engine.py", lines=100), sandbox=None, triage=_triage(0.2),
+    )
+    assert verdict.decision is PolicyDecision.block
+    assert set(verdict.violated_rules) >= {
+        "sandbox_proof_required", "irreversibility_gate", "confidence_floor",
+        "patch_protected_path", "patch_size_cap",
+    }
+    assert len(verdict.reasons) == len(verdict.violated_rules)
