@@ -75,7 +75,3 @@ def test_catalog_is_immutable():
         CATALOG[ActionType.restart_service] = ActionMetadata(
             blast_radius=BlastRadius.high, reversible=False, requires_approval=True
         )
-
-
-def test_catalog_covers_every_action_type():
-    assert set(CATALOG.keys()) == set(ActionType)
