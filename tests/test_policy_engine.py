@@ -189,6 +189,18 @@ def test_flap_is_per_action_and_target():
     assert verdict.decision is PolicyDecision.allow  # different action, same target
 
 
+def test_flap_counts_applies_regardless_of_decision():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    engine.record_apply(_restart(), PolicyDecision.needs_approval)
+    now["t"] += 60.0
+    engine.record_apply(_restart(), PolicyDecision.allow)
+    now["t"] += 60.0
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+    assert "flap_protection" in verdict.violated_rules
+
+
 # Rule 6 — rate-limit circuit (stateful, system-wide)
 def test_circuit_opens_after_max_auto_applies():
     now = {"t": 1000.0}
