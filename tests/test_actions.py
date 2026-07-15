@@ -62,3 +62,20 @@ def test_scale_out_rejects_workers_above_cap():
             ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=bad)
     pa = ProposedAction(action=ActionType.scale_out, reason="absorb surge", workers=16)
     assert pa.workers == 16
+
+
+def test_action_metadata_is_frozen():
+    meta = CATALOG[ActionType.restart_service]
+    with pytest.raises(ValidationError):
+        meta.reversible = False
+
+
+def test_catalog_is_immutable():
+    with pytest.raises(TypeError):
+        CATALOG[ActionType.restart_service] = ActionMetadata(
+            blast_radius=BlastRadius.high, reversible=False, requires_approval=True
+        )
+
+
+def test_catalog_covers_every_action_type():
+    assert set(CATALOG.keys()) == set(ActionType)
