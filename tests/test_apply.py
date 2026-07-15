@@ -2,7 +2,8 @@ from pathlib import Path
 
 from apply.applier import PatchApplier
 from agent.nodes.apply import apply_node
-from agent.state import ProposedFix
+from agent.state import PolicyDecision, PolicyVerdict, ProposedFix
+from policy.engine import PolicyEngine
 from tests.test_agent_nodes import make_incident
 
 
@@ -48,14 +49,16 @@ class FakeApplier:
 
 async def test_apply_node_calls_applier():
     applier = FakeApplier()
+    engine = PolicyEngine()
     fix = ProposedFix(
         description="cap growth",
         patch="+cap = 100\n",
         target_file="mock_app/faults/memory_leak.py",
     )
-    state = {"incident": make_incident(), "proposed_fix": fix}
+    verdict = PolicyVerdict(decision=PolicyDecision.needs_approval, violated_rules=["irreversibility_gate"])
+    state = {"incident": make_incident(), "proposed_fix": fix, "policy_verdict": verdict}
 
-    result = await apply_node(state, applier)
+    result = await apply_node(state, applier, engine)
 
     assert result == {}
     assert applier.applied == [("mock_app/faults/memory_leak.py", "+cap = 100\n")]

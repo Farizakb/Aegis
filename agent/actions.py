@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from enum import Enum
+from types import MappingProxyType
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ActionType(str, Enum):
@@ -24,12 +25,14 @@ class BlastRadius(str, Enum):
 
 
 class ActionMetadata(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
     blast_radius: BlastRadius
     reversible: bool
     requires_approval: bool
 
 
-CATALOG: dict[ActionType, ActionMetadata] = {
+CATALOG: MappingProxyType[ActionType, ActionMetadata] = MappingProxyType({
     ActionType.restart_service: ActionMetadata(
         blast_radius=BlastRadius.low, reversible=True, requires_approval=False),
     ActionType.rollback: ActionMetadata(
@@ -42,7 +45,7 @@ CATALOG: dict[ActionType, ActionMetadata] = {
         blast_radius=BlastRadius.high, reversible=False, requires_approval=True),
     ActionType.escalate: ActionMetadata(
         blast_radius=BlastRadius.none, reversible=True, requires_approval=False),
-}
+})
 
 
 class ProposedAction(BaseModel):

@@ -57,7 +57,7 @@ def build_graph(
     g.add_node("sandbox", partial(sandbox_node, executor=executor))
     g.add_node("policy", partial(policy_node, engine=policy_engine))
     g.add_node("hitl", partial(hitl_node, gate=approval_gate))
-    g.add_node("apply", partial(apply_node, applier=applier))
+    g.add_node("apply", partial(apply_node, applier=applier, engine=policy_engine))
     g.add_node("report", partial(report_node, sink=report_sink))
 
     g.add_edge(START, "triage")

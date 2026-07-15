@@ -84,14 +84,18 @@ def _build(sandbox_result, policy_engine, hitl_decision, applier=None):
     return graph, sink, applier
 
 
-async def test_happy_path_sandbox_pass_policy_allow_hitl_approve():
+async def test_happy_path_sandbox_pass_policy_needs_approval_hitl_approve():
     from policy.engine import PolicyEngine
+    # patch_code is always at least needs_approval (irreversibility_gate) even
+    # with a passing sandbox and high-confidence triage — never auto-allowed.
     sandbox_ok = SandboxResult(passed=True, exit_code=0, stdout="1 passed", stderr="", duration_ms=100)
     decision = HitlDecision(choice=HitlChoice.approve)
     graph, sink, applier = _build(sandbox_ok, PolicyEngine(), decision)
 
     result = await graph.ainvoke(_init_state())
 
+    assert result["policy_verdict"].decision == PolicyDecision.needs_approval
+    assert "irreversibility_gate" in result["policy_verdict"].violated_rules
     assert result["report"].outcome == Outcome.applied
     assert len(applier.applied) == 1
 
@@ -122,6 +126,28 @@ async def test_policy_block_skips_hitl():
     assert result["report"].outcome == Outcome.blocked
     assert result["hitl_decision"] is None
     assert len(applier.applied) == 0
+
+
+async def test_apply_records_with_engine_after_success():
+    class RecordingEngine:
+        def __init__(self):
+            self.calls = []
+
+        def evaluate(self, **kwargs):
+            return PolicyVerdict(decision=PolicyDecision.needs_approval, violated_rules=["irreversibility_gate"])
+
+        def record_apply(self, proposal, decision):
+            self.calls.append((proposal.action.value, decision))
+
+    sandbox_ok = SandboxResult(passed=True, exit_code=0, stdout="", stderr="", duration_ms=100)
+    decision = HitlDecision(choice=HitlChoice.approve)
+    engine = RecordingEngine()
+    graph, sink, applier = _build(sandbox_ok, engine, decision)
+
+    result = await graph.ainvoke(_init_state())
+
+    assert result["report"].outcome == Outcome.applied
+    assert engine.calls == [("patch_code", PolicyDecision.needs_approval)]
 
 
 async def test_hitl_reject_skips_apply():
