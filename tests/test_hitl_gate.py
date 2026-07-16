@@ -1,68 +1,83 @@
+"""ApprovalGate: TTL expiry, evidence-brief building, resolve/list_pending (ADR-0005)."""
+
 import asyncio
 
-from agent.nodes.hitl import hitl_node
-from agent.state import HitlChoice, HitlDecision, PolicyDecision, PolicyVerdict, ProposedFix
-from hitl.gate import ApprovalGate
-from tests.test_agent_nodes import make_incident
+from agent.actions import ActionType, ProposedAction
+from agent.state import (
+    HitlChoice, HitlDecision, PolicyDecision, PolicyVerdict, RemediationPlan, SandboxResult,
+)
+from hitl.gate import ApprovalGate, build_brief
+from tests.test_agent_nodes import make_incident, make_triage
 
 
-async def test_gate_resolve_completes_future():
-    gate = ApprovalGate()
-    incident = make_incident()
-    fix = ProposedFix(description="fix", patch="+x\n", target_file="mock_app/main.py")
-    verdict = PolicyVerdict(decision=PolicyDecision.allow)
-
-    async def _approve_after_delay():
-        await asyncio.sleep(0.01)
-        gate.resolve(incident.incident_id, HitlChoice.approve, note="lgtm")
-
-    asyncio.get_event_loop().create_task(_approve_after_delay())
-    decision = await gate.request_approval(incident=incident, fix=fix, verdict=verdict)
-
-    assert decision.choice == HitlChoice.approve
-    assert decision.note == "lgtm"
+def _verdict(**kwargs) -> PolicyVerdict:
+    defaults = dict(decision=PolicyDecision.needs_approval, violated_rules=["irreversibility_gate"],
+                    reasons=["patch_code always requires approval"])
+    defaults.update(kwargs)
+    return PolicyVerdict(**defaults)
 
 
-async def test_gate_list_pending_shows_item():
-    gate = ApprovalGate()
-    incident = make_incident()
-    fix = ProposedFix(description="fix", patch="+x\n", target_file="mock_app/main.py")
-    verdict = PolicyVerdict(decision=PolicyDecision.allow)
-
-    async def _request():
-        await gate.request_approval(incident=incident, fix=fix, verdict=verdict)
-
-    task = asyncio.create_task(_request())
-    await asyncio.sleep(0.01)
-
-    pending = gate.list_pending()
-    assert len(pending) == 1
-    assert pending[0]["incident_id"] == incident.incident_id
-
-    gate.resolve(incident.incident_id, HitlChoice.reject)
-    await task
+def _passing_sandbox() -> SandboxResult:
+    return SandboxResult(passed=True, exit_code=0, stdout="1 passed", stderr="", duration_ms=250.0,
+                         before_metrics={"rss_mb": 200.0}, after_metrics={"rss_mb": 40.0})
 
 
-class FakeGate:
-    def __init__(self, decision: HitlDecision):
-        self._decision = decision
+def _plan_with_durable_fix() -> RemediationPlan:
+    return RemediationPlan(
+        mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"),
+        durable_fix=ProposedAction(action=ActionType.patch_code, reason="cap growth",
+                                   patch="+cap = 100\n", target_file="mock_app/faults/memory_leak.py"),
+    )
 
-    async def request_approval(self, *, incident, fix, verdict) -> HitlDecision:
-        return self._decision
+
+def _plan_plain() -> RemediationPlan:
+    return RemediationPlan(mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"))
 
 
-async def test_hitl_node_returns_decision():
-    decision = HitlDecision(choice=HitlChoice.approve)
-    gate = FakeGate(decision)
-    fix = ProposedFix(description="fix", patch="+x\n", target_file="mock_app/main.py")
-    verdict = PolicyVerdict(decision=PolicyDecision.needs_approval)
-    state = {
-        "incident": make_incident(),
-        "proposed_fix": fix,
-        "policy_verdict": verdict,
-        "hitl_decision": None,
-    }
+async def _ask(gate: ApprovalGate, incident_id: str = "i-1") -> HitlDecision:
+    incident = make_incident(incident_id=incident_id)
+    return await gate.request_approval(
+        incident=incident, plan=_plan_with_durable_fix(), sandbox=_passing_sandbox(),
+        verdict=_verdict(), triage=make_triage())
 
-    result = await hitl_node(state, gate)
 
-    assert result["hitl_decision"] == decision
+async def test_approve_resolves_and_clears_brief():
+    gate = ApprovalGate(ttl_s=5.0)
+    task = asyncio.create_task(_ask(gate, incident_id="i-1"))
+    await asyncio.sleep(0)  # let the future register
+    assert gate.list_pending()[0]["incident_id"] == "i-1"
+    gate.resolve("i-1", HitlChoice.approve)
+    decision = await task
+    assert decision.choice is HitlChoice.approve
+    assert gate.list_pending() == []
+
+
+async def test_ttl_expiry_returns_expired_decision():
+    gate = ApprovalGate(ttl_s=0.05)
+    decision = await _ask(gate, incident_id="i-2")
+    assert decision.choice is HitlChoice.expired
+    assert decision.decided_by == "ttl"
+    assert gate.list_pending() == []
+
+
+async def test_env_ttl_used_when_not_passed(monkeypatch):
+    monkeypatch.setenv("HITL_TTL_S", "42")
+    assert ApprovalGate().ttl_s == 42.0
+
+
+def test_build_brief_carries_evidence_and_durable_fix():
+    brief = build_brief(incident=make_incident(), plan=_plan_with_durable_fix(),
+                        sandbox=_passing_sandbox(), verdict=_verdict(),
+                        triage=make_triage(), expires_at=123.0)
+    assert brief["evidence"]["before_metrics"] is not None
+    assert brief["evidence"]["after_metrics"] is not None
+    assert brief["policy"]["decision"] == "needs_approval"
+    assert brief["durable_fix"]["action"] == "patch_code"
+    assert brief["mitigation"]["action"] == "restart_service"
+
+
+def test_build_brief_without_sandbox_or_fix():
+    brief = build_brief(incident=make_incident(), plan=_plan_plain(),
+                        sandbox=None, verdict=_verdict(), triage=None, expires_at=1.0)
+    assert brief["evidence"] is None
+    assert brief["durable_fix"] is None

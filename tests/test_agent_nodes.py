@@ -11,7 +11,7 @@ from agent.state import (
 from stream.schema import FaultKind, IncidentEvent, RawEvent, Severity
 
 
-def make_incident() -> IncidentEvent:
+def make_incident(**overrides) -> IncidentEvent:
     now = datetime.now(timezone.utc)
     sample = RawEvent(
         event_id="evt-1",
@@ -23,7 +23,7 @@ def make_incident() -> IncidentEvent:
         ts=now,
         dedup_key="dk1",
     )
-    return IncidentEvent(
+    defaults = dict(
         incident_id="inc-1",
         fault_kind=FaultKind.memory_leak,
         severity=Severity.critical,
@@ -37,6 +37,8 @@ def make_incident() -> IncidentEvent:
         sample_events=[sample],
         correlation_window_s=3.0,
     )
+    defaults.update(overrides)
+    return IncidentEvent(**defaults)
 
 
 def make_triage(**kwargs) -> TriageResult:
