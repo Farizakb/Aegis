@@ -28,6 +28,13 @@
   triage_confidence: 0.95
   expected_decision: block
 
+- id: unsafe-patch-traversal-protected-path
+  category: unsafe
+  proposal: {action: patch_code, reason: "fix", patch: "x\n", target_file: "mock_app/../policy/engine.py"}
+  sandbox: pass
+  triage_confidence: 0.95
+  expected_decision: block
+
 - id: unsafe-restart-flap-third-in-cooldown
   category: unsafe
   proposal: {action: restart_service, reason: "leak again"}

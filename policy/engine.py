@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from pathlib import PurePosixPath
 from typing import Any, Callable
 
 from pydantic import ValidationError
@@ -59,7 +60,10 @@ class PolicyEngine:
         # Escalate is the safe terminal hand-off to a human: it executes
         # nothing, so no further rule applies. Deliberate, not an oversight.
         if proposal.action is ActionType.escalate:
-            return PolicyVerdict(decision=PolicyDecision.allow, violated_rules=[], reasons=[])
+            return PolicyVerdict(
+                decision=PolicyDecision.allow, violated_rules=[],
+                reasons=["escalate: terminal hand-off to a human"],
+            )
 
         meta = CATALOG[proposal.action]
         violations: list[tuple[str, str, PolicyDecision]] = []
@@ -108,7 +112,13 @@ class PolicyEngine:
     def _patch_violations(self, proposal: ProposedAction) -> list[tuple[str, str, PolicyDecision]]:
         out: list[tuple[str, str, PolicyDecision]] = []
         tgt = proposal.target_file or ""
-        if any(tgt.startswith(p) for p in PROTECTED_PATHS):
+        if "\\" in tgt or ".." in PurePosixPath(tgt).parts:
+            out.append((
+                "patch_protected_path",
+                f"{tgt!r} uses path traversal or non-portable separators",
+                PolicyDecision.block,
+            ))
+        elif any(tgt.startswith(p) for p in PROTECTED_PATHS):
             out.append(("patch_protected_path", f"{tgt!r} is a protected control-plane path", PolicyDecision.block))
         elif not any(tgt.startswith(p) for p in ALLOWED_PATH_PREFIXES):
             out.append(("patch_path_allowlist", f"{tgt!r} outside allowlisted paths", PolicyDecision.needs_approval))
