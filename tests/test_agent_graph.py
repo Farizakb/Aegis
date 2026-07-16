@@ -1,7 +1,7 @@
 # tests/test_agent_graph.py
 from datetime import datetime, timezone
 
-from agent.graph import build_graph
+from agent.graph import build_graph, route_after_sandbox
 from agent.state import (
     HitlChoice,
     HitlDecision,
@@ -17,6 +17,26 @@ from tests.test_agent_nodes import FakeLLM, FakeSearchTool
 from tests.test_sandbox_node import FakeExecutor
 from tests.test_hitl_gate import FakeGate
 from tests.test_report_node import FakeSink
+
+
+def _result(passed: bool) -> SandboxResult:
+    return SandboxResult(passed=passed, exit_code=0 if passed else 1,
+                         stdout="", stderr="", duration_ms=1.0)
+
+
+def test_route_sandbox_none_goes_to_policy():
+    state = {"sandbox_result": None, "retries": 0}
+    assert route_after_sandbox(state) == "policy"
+
+
+def test_route_sandbox_pass_goes_to_policy():
+    state = {"sandbox_result": _result(True), "retries": 0}
+    assert route_after_sandbox(state) == "policy"
+
+
+def test_route_sandbox_fail_retries_then_reports():
+    assert route_after_sandbox({"sandbox_result": _result(False), "retries": 1}) == "propose"
+    assert route_after_sandbox({"sandbox_result": _result(False), "retries": 2}) == "report"
 
 
 class FakeApplier:

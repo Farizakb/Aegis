@@ -21,7 +21,8 @@ MAX_RETRIES = 2
 
 
 def route_after_sandbox(state: AgentState) -> str:
-    if state["sandbox_result"].passed:
+    result = state["sandbox_result"]
+    if result is None or result.passed:
         return "policy"
     if state["retries"] < MAX_RETRIES:
         return "propose"

@@ -16,7 +16,7 @@ from docker.types import LogConfig
 
 from agent.actions import ActionType, ProposedAction
 from agent.state import SandboxResult
-from sandbox.recovery import check_degraded, check_recovered, should_retrigger
+from sandbox.recovery import RECOVERED_CEILING, check_degraded, check_recovered, should_retrigger
 from stream.schema import FaultKind
 
 IMAGE = "aegis-sandbox:latest"
@@ -117,6 +117,7 @@ class SandboxExecutor:
                 self._trigger(base_url, fault_kind, allow_conflict=True)
             self._drive_load(base_url, fault_kind, phase="after")
             after = self._metrics(base_url)
+            after.setdefault(RECOVERED_CEILING[fault_kind][0], 0.0)
 
             passed, reason = check_recovered(fault_kind, before, after)
             return self._result(passed, before, after, None if passed else reason, start,

@@ -1,52 +1,70 @@
+"""Sandbox node: verify() wiring, attempt tracking, skip logic (ADR-0002/0006)."""
+
+import pytest
+
+from agent.actions import ActionType, ProposedAction
 from agent.nodes.sandbox import sandbox_node
-from agent.state import ProposedFix, SandboxResult
+from agent.state import AttemptRecord, RemediationPlan, SandboxResult, initial_state
+from stream.schema import FaultKind
 from tests.test_agent_nodes import make_incident
 
 
 class FakeExecutor:
-    def __init__(self, result: SandboxResult):
+    def __init__(self, result):
         self._result = result
-        self.last_patch = None
-        self.last_target = None
+        self.calls = []
 
-    async def run(self, *, patch: str, target_file: str) -> SandboxResult:
-        self.last_patch = patch
-        self.last_target = target_file
+    async def verify(self, action, fault_kind):
+        self.calls.append((action, fault_kind))
         return self._result
 
 
-async def test_sandbox_node_returns_result():
-    sandbox_result = SandboxResult(
-        passed=True, exit_code=0, stdout="1 passed", stderr="", duration_ms=1500.0
-    )
-    executor = FakeExecutor(sandbox_result)
-    fix = ProposedFix(
-        description="cap memory",
-        patch="--- a/mock_app/faults/memory_leak.py\n+++ b/mock_app/faults/memory_leak.py\n",
-        target_file="mock_app/faults/memory_leak.py",
-    )
-    state = {
-        "incident": make_incident(),
-        "proposed_fix": fix,
-        "sandbox_result": None,
-    }
-
-    result = await sandbox_node(state, executor)
-
-    assert result["sandbox_result"] == sandbox_result
-    assert executor.last_patch == fix.patch
-    assert executor.last_target == fix.target_file
+def _result(passed: bool) -> SandboxResult:
+    return SandboxResult(passed=passed, exit_code=0 if passed else 1,
+                         stdout="", stderr="", duration_ms=1.0)
 
 
-async def test_sandbox_node_with_failed_result():
-    sandbox_result = SandboxResult(
-        passed=False, exit_code=1, stdout="", stderr="patch failed", duration_ms=200.0
-    )
-    executor = FakeExecutor(sandbox_result)
-    fix = ProposedFix(description="bad fix", patch="garbage", target_file="mock_app/main.py")
-    state = {"incident": make_incident(), "proposed_fix": fix, "sandbox_result": None}
+def _state(action=ActionType.restart_service, **kwargs):
+    state = initial_state(make_incident())
+    state["plan"] = RemediationPlan(
+        mitigation=ProposedAction(action=action, reason="test", **kwargs))
+    return state
 
-    result = await sandbox_node(state, executor)
 
-    assert result["sandbox_result"].passed is False
-    assert result["sandbox_result"].exit_code == 1
+async def test_verify_called_with_mitigation_and_fault_kind():
+    executor = FakeExecutor(_result(True))
+    state = _state()
+    out = await sandbox_node(state, executor=executor)
+    action, kind = executor.calls[0]
+    assert action.action is ActionType.restart_service
+    assert kind is FaultKind.memory_leak
+    assert out["sandbox_result"].passed is True
+
+
+async def test_attempt_appended_and_retries_counted():
+    executor = FakeExecutor(_result(False))
+    state = _state()
+    prior = AttemptRecord(
+        action=ProposedAction(action=ActionType.restart_service, reason="1st"),
+        result=_result(False))
+    state["attempted"] = [prior]
+    out = await sandbox_node(state, executor=executor)
+    assert len(out["attempted"]) == 2
+    assert out["retries"] == 1
+
+
+async def test_escalate_skips_sandbox():
+    executor = FakeExecutor(_result(True))
+    state = _state(action=ActionType.escalate)
+    out = await sandbox_node(state, executor=executor)
+    assert out["sandbox_result"] is None
+    assert executor.calls == []
+
+
+async def test_non_reproducible_fault_skips_sandbox(monkeypatch):
+    monkeypatch.setattr("agent.nodes.sandbox.is_reproducible", lambda kind: False)
+    executor = FakeExecutor(_result(True))
+    state = _state()
+    out = await sandbox_node(state, executor=executor)
+    assert out["sandbox_result"] is None
+    assert executor.calls == []

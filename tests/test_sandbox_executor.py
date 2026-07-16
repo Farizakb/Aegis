@@ -178,3 +178,21 @@ def test_verify_sync_keeps_before_metrics_when_apply_raises(monkeypatch):
     assert result.passed is False
     assert result.before_metrics == {"rss_mb": 999.0}
     assert "apply exploded" in result.stderr
+
+
+def test_verify_materializes_checked_metric_as_zero(monkeypatch):
+    """M-2 carry-in: a recovered fault stops reporting its metric; the HITL brief
+    must show an explicit 0.0, not a missing key."""
+    executor = SandboxExecutor(docker_client=None)
+    monkeypatch.setattr(executor, "_start_app", lambda env: (FakeContainer(), "http://x"))
+    monkeypatch.setattr(executor, "_trigger", lambda *a, **k: None)
+    monkeypatch.setattr(executor, "_drive_load", lambda *a, **k: None)
+    metrics = iter([{"latency_ms": 200.0}, {}])  # after-recovery: metric gone
+    monkeypatch.setattr(executor, "_metrics", lambda url: dict(next(metrics)))
+    monkeypatch.setattr(executor, "_apply_action", lambda c, u, a: (c, u))
+    monkeypatch.setattr(executor, "_safe_remove", lambda c: None)
+
+    action = ProposedAction(action=ActionType.scale_out, reason="surge", workers=4)
+    result = executor._verify_sync(action, FaultKind.traffic_surge)
+    assert result.passed is True
+    assert result.after_metrics["latency_ms"] == 0.0
