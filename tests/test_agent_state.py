@@ -3,7 +3,11 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from agent.state import NodeUsage, ProposedFix, RetrievedChunk, TriageResult
+from agent.actions import ActionType, ProposedAction
+from agent.state import (
+    AgentState, AttemptRecord, HitlChoice, IncidentReport, NodeUsage, Outcome,
+    RemediationPlan, RetrievedChunk, SandboxResult, TriageResult, initial_state,
+)
 from stream.schema import FaultKind, IncidentEvent, Severity
 
 
@@ -23,6 +27,15 @@ def make_incident() -> IncidentEvent:
         sample_events=[],
         correlation_window_s=3.0,
     )
+
+
+def _action() -> ProposedAction:
+    return ProposedAction(action=ActionType.restart_service, reason="leak")
+
+
+def _result(passed: bool = False) -> SandboxResult:
+    return SandboxResult(passed=passed, exit_code=0 if passed else 1,
+                         stdout="", stderr="", duration_ms=1.0)
 
 
 def test_triage_result_validates():
@@ -45,16 +58,9 @@ def test_triage_result_rejects_out_of_range_confidence():
         )
 
 
-def test_retrieved_chunk_and_proposed_fix_roundtrip():
+def test_retrieved_chunk_validates():
     chunk = RetrievedChunk(source="runbook:memory_leak.md", content="...", score=0.83)
-    fix = ProposedFix(
-        description="cap memory growth",
-        patch="--- a/mock_app/faults/memory_leak.py\n+++ b/mock_app/faults/memory_leak.py\n",
-        target_file="mock_app/faults/memory_leak.py",
-    )
-
     assert chunk.score == 0.83
-    assert fix.target_file == "mock_app/faults/memory_leak.py"
 
 
 def test_incident_event_is_the_agent_input():
@@ -75,8 +81,6 @@ def test_node_usage_validates():
 
 
 def test_sandbox_result_validates():
-    from agent.state import SandboxResult
-
     r = SandboxResult(passed=True, exit_code=0, stdout="1 passed", stderr="", duration_ms=1200.0)
     assert r.passed is True
     assert r.exit_code == 0
@@ -95,15 +99,38 @@ def test_policy_verdict_validates():
 
 
 def test_hitl_decision_validates():
-    from agent.state import HitlChoice, HitlDecision
+    from agent.state import HitlDecision
 
     d = HitlDecision(choice=HitlChoice.approve, decided_by="local-ui", note="looks good")
     assert d.choice == HitlChoice.approve
 
 
-def test_incident_report_validates():
-    from agent.state import Outcome, IncidentReport
+def test_remediation_plan_mitigation_only():
+    plan = RemediationPlan(mitigation=_action())
+    assert plan.durable_fix is None
 
+
+def test_remediation_plan_with_durable_fix():
+    plan = RemediationPlan(
+        mitigation=_action(),
+        durable_fix=ProposedAction(
+            action=ActionType.patch_code, reason="fix the leak",
+            patch="--- a/x\n+++ b/x\n", target_file="mock_app/faults/memory_leak.py"),
+    )
+    assert plan.durable_fix.action is ActionType.patch_code
+
+
+def test_attempt_record_pairs_action_with_evidence():
+    rec = AttemptRecord(action=_action(), result=_result())
+    assert rec.action.action is ActionType.restart_service
+    assert rec.result.passed is False
+
+
+def test_hitl_choice_has_expired():
+    assert HitlChoice.expired.value == "expired"
+
+
+def test_incident_report_validates():
     r = IncidentReport(
         incident_id="inc-1",
         fault_kind=FaultKind.memory_leak,
@@ -118,21 +145,30 @@ def test_incident_report_validates():
     assert r.retries == 1
 
 
-from agent.actions import ActionType, ProposedAction
-from agent.state import RemediationPlan
+def test_incident_report_v2_fields_default():
+    report = IncidentReport(incident_id="i-1", fault_kind=FaultKind.memory_leak,
+                            outcome=Outcome.escalated)
+    assert report.mitigation_action is None
+    assert report.attempted_actions == []
+    assert report.durable_fix is None
+    assert report.apply_error is None
 
 
-def test_remediation_plan_mitigation_only():
-    plan = RemediationPlan(
-        mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"))
-    assert plan.durable_fix is None
+def test_proposed_fix_is_gone():
+    import agent.state
+    assert not hasattr(agent.state, "ProposedFix")
 
 
-def test_remediation_plan_with_durable_fix():
-    plan = RemediationPlan(
-        mitigation=ProposedAction(action=ActionType.restart_service, reason="clear leak"),
-        durable_fix=ProposedAction(
-            action=ActionType.patch_code, reason="fix the leak",
-            patch="--- a/x\n+++ b/x\n", target_file="mock_app/faults/memory_leak.py"),
-    )
-    assert plan.durable_fix.action is ActionType.patch_code
+def test_initial_state_defaults():
+    state = initial_state(make_incident())
+    assert state["plan"] is None
+    assert state["attempted"] == []
+    assert state["applied"] is False
+    assert state["apply_error"] is None
+    assert state["retries"] == 0
+
+
+def test_initial_state_promoted_run_presets_plan():
+    plan = RemediationPlan(mitigation=_action())
+    state = initial_state(make_incident(), plan=plan)
+    assert state["plan"] is plan
