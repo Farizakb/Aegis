@@ -7,6 +7,7 @@ from functools import partial
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from agent.actions import ActionType
 from agent.nodes.apply import apply_node
 from agent.nodes.hitl import hitl_node
 from agent.nodes.policy import policy_node
@@ -32,6 +33,10 @@ def route_after_sandbox(state: AgentState) -> str:
 def route_after_policy(state: AgentState) -> str:
     if state["policy_verdict"].decision == PolicyDecision.block:
         return "report"
+    if state["plan"].mitigation.action is ActionType.escalate:
+        return "report"  # terminal hand-off; outcome=escalated
+    if state["policy_verdict"].decision == PolicyDecision.allow:
+        return "apply"  # auto-apply: this is what rule 6's circuit meters
     return "hitl"
 
 
@@ -73,6 +78,7 @@ def build_graph(
     })
     g.add_conditional_edges("policy", route_after_policy, {
         "hitl": "hitl",
+        "apply": "apply",
         "report": "report",
     })
     g.add_conditional_edges("hitl", route_after_hitl, {

@@ -1,7 +1,8 @@
 # tests/test_agent_graph.py
 from datetime import datetime, timezone
 
-from agent.graph import build_graph, route_after_sandbox
+from agent.actions import ActionType, ProposedAction
+from agent.graph import build_graph, route_after_policy, route_after_sandbox
 from agent.state import (
     HitlChoice,
     HitlDecision,
@@ -9,6 +10,7 @@ from agent.state import (
     PolicyDecision,
     PolicyVerdict,
     ProposedFix,
+    RemediationPlan,
     SandboxResult,
     TriageResult,
 )
@@ -37,6 +39,30 @@ def test_route_sandbox_pass_goes_to_policy():
 def test_route_sandbox_fail_retries_then_reports():
     assert route_after_sandbox({"sandbox_result": _result(False), "retries": 1}) == "propose"
     assert route_after_sandbox({"sandbox_result": _result(False), "retries": 2}) == "report"
+
+
+def _policy_state(decision, action=ActionType.restart_service):
+    return {
+        "policy_verdict": PolicyVerdict(decision=decision),
+        "plan": RemediationPlan(mitigation=ProposedAction(action=action, reason="t")),
+    }
+
+
+def test_route_policy_block_reports():
+    assert route_after_policy(_policy_state(PolicyDecision.block)) == "report"
+
+
+def test_route_policy_escalate_reports_even_when_allowed():
+    assert route_after_policy(
+        _policy_state(PolicyDecision.allow, action=ActionType.escalate)) == "report"
+
+
+def test_route_policy_allow_auto_applies():
+    assert route_after_policy(_policy_state(PolicyDecision.allow)) == "apply"
+
+
+def test_route_policy_needs_approval_goes_to_hitl():
+    assert route_after_policy(_policy_state(PolicyDecision.needs_approval)) == "hitl"
 
 
 class FakeApplier:

@@ -1,22 +1,16 @@
-"""Apply node: write the proven patch to the live working tree."""
+"""Apply node: execute the policy-cleared mitigation on the live target."""
 
 from __future__ import annotations
 
-from agent.actions import ProposedAction
 from agent.state import AgentState
 
 
 async def apply_node(state: AgentState, applier, engine) -> dict:
-    fix = state["proposed_fix"]
-    applier.apply(target_file=fix.target_file, patch=fix.patch)
-    # Same legacy-bridge proposal shape built in policy_node; by the time we
-    # reach apply_node it has already passed engine.evaluate (non-block), so
-    # it is guaranteed to parse into the typed catalog.
-    proposal = ProposedAction(
-        action="patch_code",
-        reason=fix.description,
-        patch=fix.patch,
-        target_file=fix.target_file,
-    )
-    engine.record_apply(proposal, state["policy_verdict"].decision)
-    return {}
+    mitigation = state["plan"].mitigation
+    try:
+        applier.apply(mitigation)
+    except Exception as exc:
+        # A failed live apply is an escalation, not a crash: report it.
+        return {"applied": False, "apply_error": str(exc)}
+    engine.record_apply(mitigation, state["policy_verdict"].decision)
+    return {"applied": True}
