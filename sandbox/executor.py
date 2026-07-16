@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import io
-import subprocess
 import tarfile
 import tempfile
 import time
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 
 import httpx
 from docker.errors import NotFound
@@ -16,6 +15,7 @@ from docker.types import LogConfig
 
 from agent.actions import ActionType, ProposedAction
 from agent.state import SandboxResult
+from apply.patching import render_patched_file
 from sandbox.recovery import RECOVERED_CEILING, check_degraded, check_recovered, should_retrigger
 from stream.schema import FaultKind
 
@@ -221,31 +221,14 @@ class SandboxExecutor:
 
     def _copy_patched_file(self, container, action: ProposedAction) -> None:
         repo_root = Path(__file__).resolve().parents[1]
-        candidate = (repo_root / action.target_file).resolve()
-        is_absolute = (
-            PurePosixPath(action.target_file).is_absolute()
-            or PureWindowsPath(action.target_file).is_absolute()
-        )
-        if is_absolute or not candidate.is_relative_to(repo_root):
-            raise ValueError(f"target_file escapes repository root: {action.target_file}")
-        with tempfile.TemporaryDirectory() as tmp:
-            dest = Path(tmp) / action.target_file
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes((repo_root / action.target_file).read_bytes())
-            (Path(tmp) / "action.patch").write_text(action.patch, encoding="utf-8", newline="")
-            try:
-                subprocess.run(["git", "apply", "action.patch"], cwd=tmp,
-                               check=True, capture_output=True)
-            except subprocess.CalledProcessError as exc:
-                stderr = (exc.stderr or b"").decode(errors="replace").strip()
-                raise RuntimeError(
-                    f"git apply failed for {action.target_file}: {stderr}"
-                ) from exc
-            buf = io.BytesIO()
-            with tarfile.open(fileobj=buf, mode="w") as tar:
-                tar.add(dest, arcname=action.target_file)
-            buf.seek(0)
-            container.put_archive("/app", buf.getvalue())
+        patched = render_patched_file(repo_root, action.target_file, action.patch)
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            info = tarfile.TarInfo(name=action.target_file)
+            info.size = len(patched)
+            tar.addfile(info, io.BytesIO(patched))
+        buf.seek(0)
+        container.put_archive("/app", buf.getvalue())
 
     def _result(self, passed: bool, before, after, failure_reason: str | None,
                 start: float, pytest_stdout: str = "") -> SandboxResult:
