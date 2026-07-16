@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
+from agent.actions import ActionType, ProposedAction
 from agent.nodes.propose import propose_node
 from agent.nodes.retrieve import retrieve_node
 from agent.nodes.triage import triage_node
-from agent.state import ProposedFix, RetrievedChunk, TriageResult
+from agent.state import (
+    AttemptRecord, RemediationPlan, RetrievedChunk, SandboxResult, TriageResult, initial_state,
+)
 from stream.schema import FaultKind, IncidentEvent, RawEvent, Severity
 
 
@@ -35,12 +39,25 @@ def make_incident() -> IncidentEvent:
     )
 
 
+def make_triage(**kwargs) -> TriageResult:
+    defaults = dict(
+        fault_kind=FaultKind.memory_leak,
+        root_cause="unbounded list growth",
+        confidence=0.9,
+        reasoning="rss grows linearly with each tick",
+    )
+    defaults.update(kwargs)
+    return TriageResult(**defaults)
+
+
 class FakeRaw:
     def __init__(self, usage_metadata: dict):
         self.usage_metadata = usage_metadata
 
 
-class FakeStructuredLLM:
+class _FakeStructuredResult:
+    """Backs FakeLLM.with_structured_output; keyed-by-type fake used by triage/retrieve tests."""
+
     def __init__(self, result, usage_metadata: dict | None = None):
         self._result = result
         self._usage_metadata = usage_metadata or {"input_tokens": 100, "output_tokens": 20}
@@ -55,10 +72,10 @@ class FakeLLM:
     def __init__(self, results: dict[type, object], model: str = "fake-model"):
         self._results = results
         self.model = model
-        self.structured: dict[type, FakeStructuredLLM] = {}
+        self.structured: dict[type, _FakeStructuredResult] = {}
 
     def with_structured_output(self, model, include_raw=False):
-        structured = FakeStructuredLLM(self._results[model])
+        structured = _FakeStructuredResult(self._results[model])
         self.structured[model] = structured
         return structured
 
@@ -73,26 +90,31 @@ class FakeSearchTool:
         return self._chunks
 
 
+class FakeStructuredLLM:
+    """Captures prompts; returns queued {'raw','parsed'} responses."""
+
+    def __init__(self, parsed_queue):
+        self.prompts = []
+        self._queue = list(parsed_queue)
+        self.model = "fake-model"
+
+    def with_structured_output(self, schema, include_raw=True):
+        return self
+
+    async def ainvoke(self, prompt):
+        self.prompts.append(prompt)
+        return {"raw": SimpleNamespace(usage_metadata={"input_tokens": 10, "output_tokens": 5}),
+                "parsed": self._queue.pop(0)}
+
+
+def _plan(action=ActionType.restart_service, **kwargs) -> RemediationPlan:
+    return RemediationPlan(mitigation=ProposedAction(action=action, reason="test", **kwargs))
+
+
 async def test_triage_node_returns_triage_result():
-    triage_result = TriageResult(
-        fault_kind=FaultKind.memory_leak,
-        root_cause="unbounded list growth in MemoryLeakFault",
-        confidence=0.9,
-        reasoning="rss grows linearly with each tick",
-    )
+    triage_result = make_triage(root_cause="unbounded list growth in MemoryLeakFault")
     llm = FakeLLM({TriageResult: triage_result}, model="claude-haiku-4-5-20251001")
-    state = {
-        "incident": make_incident(),
-        "triage": None,
-        "retrieved_context": [],
-        "proposed_fix": None,
-        "retries": 0,
-        "sandbox_result": None,
-        "policy_verdict": None,
-        "hitl_decision": None,
-        "report": None,
-        "usage": [],
-    }
+    state = initial_state(make_incident())
 
     result = await triage_node(state, llm)
 
@@ -107,25 +129,9 @@ async def test_triage_node_returns_triage_result():
 
 
 async def test_retrieve_node_uses_triage_root_cause_in_query():
-    triage_result = TriageResult(
-        fault_kind=FaultKind.memory_leak,
-        root_cause="unbounded list growth",
-        confidence=0.9,
-        reasoning="...",
-    )
+    triage_result = make_triage(reasoning="...")
     search_tool = FakeSearchTool([{"source": "runbook:memory_leak.md", "content": "...", "score": 0.8}])
-    state = {
-        "incident": make_incident(),
-        "triage": triage_result,
-        "retrieved_context": [],
-        "proposed_fix": None,
-        "retries": 0,
-        "sandbox_result": None,
-        "policy_verdict": None,
-        "hitl_decision": None,
-        "report": None,
-        "usage": [],
-    }
+    state = initial_state(make_incident(), triage=triage_result)
 
     result = await retrieve_node(state, search_tool)
 
@@ -134,40 +140,49 @@ async def test_retrieve_node_uses_triage_root_cause_in_query():
     assert "memory_leak" in search_tool.last_args["query"]
 
 
-async def test_propose_node_returns_proposed_fix():
-    proposed_fix = ProposedFix(
-        description="cap memory growth",
-        patch="--- a/mock_app/faults/memory_leak.py\n+++ b/mock_app/faults/memory_leak.py\n",
-        target_file="mock_app/faults/memory_leak.py",
-    )
-    llm = FakeLLM({ProposedFix: proposed_fix}, model="claude-sonnet-4-6")
-    triage_result = TriageResult(
-        fault_kind=FaultKind.memory_leak,
-        root_cause="unbounded list growth",
-        confidence=0.9,
-        reasoning="...",
-    )
-    retrieved = [RetrievedChunk(source="runbook:memory_leak.md", content="cap the chunk list", score=0.8)]
-    state = {
-        "incident": make_incident(),
-        "triage": triage_result,
-        "retrieved_context": retrieved,
-        "proposed_fix": None,
-        "retries": 0,
-        "sandbox_result": None,
-        "policy_verdict": None,
-        "hitl_decision": None,
-        "report": None,
-        "usage": [],
-    }
+async def test_propose_returns_plan_and_usage():
+    llm = FakeStructuredLLM([_plan()])
+    state = initial_state(make_incident())
+    state["triage"] = make_triage()
+    out = await propose_node(state, llm=llm)
+    assert isinstance(out["plan"], RemediationPlan)
+    assert out["usage"][-1].node == "propose"
+    assert "retries" not in out
 
-    result = await propose_node(state, llm)
 
-    assert result["proposed_fix"] == proposed_fix
-    prompt = llm.structured[ProposedFix].last_prompt
-    assert "unbounded list growth" in prompt
-    assert "cap the chunk list" in prompt
-    assert len(result["usage"]) == 1
-    usage = result["usage"][0]
-    assert usage.node == "propose"
-    assert usage.model == "claude-sonnet-4-6"
+async def test_first_attempt_prompt_lists_the_action_catalog():
+    llm = FakeStructuredLLM([_plan()])
+    state = initial_state(make_incident())
+    state["triage"] = make_triage()
+    await propose_node(state, llm=llm)
+    prompt = llm.prompts[0]
+    for name in ("restart_service", "rollback", "toggle_feature_flag",
+                 "scale_out", "patch_code", "escalate"):
+        assert name in prompt
+
+
+async def test_retry_prompt_carries_failure_evidence_and_switch_instruction():
+    llm = FakeStructuredLLM([_plan(ActionType.scale_out, workers=4)])
+    state = initial_state(make_incident())
+    state["triage"] = make_triage()
+    failed = SandboxResult(passed=False, exit_code=1, stdout="latency stayed high",
+                           stderr="", duration_ms=900.0,
+                           before_metrics={"latency_ms": 200.0},
+                           after_metrics={"latency_ms": 200.0},
+                           failure_reason="latency_ms 200.0 above recovery ceiling 100.0")
+    state["attempted"] = [AttemptRecord(
+        action=ProposedAction(action=ActionType.restart_service, reason="try restart"),
+        result=failed)]
+    await propose_node(state, llm=llm)
+    prompt = llm.prompts[0]
+    assert "restart_service" in prompt and "FAILED" in prompt
+    assert "above recovery ceiling" in prompt
+    assert "SWITCH" in prompt
+
+
+async def test_unparseable_proposal_falls_back_to_escalate():
+    llm = FakeStructuredLLM([None])  # structured output failed to parse
+    state = initial_state(make_incident())
+    state["triage"] = make_triage()
+    out = await propose_node(state, llm=llm)
+    assert out["plan"].mitigation.action is ActionType.escalate
