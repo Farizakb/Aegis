@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -12,16 +14,22 @@ from hitl.registry import DurableFixRegistry
 _DECIDABLE = {HitlChoice.approve.value, HitlChoice.reject.value}
 
 
+def _esc(value) -> str:
+    """HTML-escape any LLM/incident-derived value before interpolation."""
+    return html.escape(value if isinstance(value, str) else str(value))
+
+
 def _evidence_table(evidence: dict | None) -> str:
     if evidence is None:
         return "<p><i>No sandbox evidence (non-reproducible fault or unattempted).</i></p>"
     if not evidence["passed"]:
-        return f"<p><b>Sandbox failed:</b> {evidence['failure_reason']}</p>"
+        return f"<p><b>Sandbox failed:</b> {_esc(evidence['failure_reason'])}</p>"
     before = evidence["before_metrics"] or {}
     after = evidence["after_metrics"] or {}
     rows = ""
     for metric in sorted(set(before) | set(after)):
-        rows += f"<tr><td>{metric}</td><td>{before.get(metric, '-')}</td><td>{after.get(metric, '-')}</td></tr>"
+        rows += (f"<tr><td>{_esc(metric)}</td><td>{_esc(before.get(metric, '-'))}</td>"
+                 f"<td>{_esc(after.get(metric, '-'))}</td></tr>")
     return f"""
     <table border="1" cellpadding="4" style="border-collapse:collapse;">
         <tr><th>metric</th><th>before</th><th>after</th></tr>
@@ -32,11 +40,11 @@ def _evidence_table(evidence: dict | None) -> str:
 
 def _policy_block(policy: dict) -> str:
     rules = "".join(
-        f"<li>{rule}: {reason}</li>"
+        f"<li>{_esc(rule)}: {_esc(reason)}</li>"
         for rule, reason in zip(policy.get("violated_rules", []), policy.get("reasons", []))
     )
     return f"""
-    <p><b>Policy decision:</b> {policy['decision']}</p>
+    <p><b>Policy decision:</b> {_esc(policy['decision'])}</p>
     <ul>{rules}</ul>
     """
 
@@ -46,9 +54,9 @@ def _durable_fix_card(fix: dict | None, incident_id: str) -> str:
         return ""
     return f"""
     <div style="margin-top:8px;padding:8px;background:#fafafa;">
-        <b>Durable fix:</b> {fix['reason']}<br/>
-        <b>Target file:</b> {fix.get('target_file')}
-        <form method="post" action="/promote/{incident_id}" style="display:inline;margin-left:8px;">
+        <b>Durable fix:</b> {_esc(fix['reason'])}<br/>
+        <b>Target file:</b> {_esc(fix.get('target_file'))}
+        <form method="post" action="/promote/{_esc(incident_id)}" style="display:inline;margin-left:8px;">
             <button type="submit">Promote</button>
         </form>
     </div>
@@ -58,21 +66,22 @@ def _durable_fix_card(fix: dict | None, incident_id: str) -> str:
 def _brief_card(brief: dict) -> str:
     triage = brief.get("triage") or {}
     mitigation = brief["mitigation"]
+    iid = _esc(brief["incident_id"])
     return f"""
     <div style="border:1px solid #ccc;padding:16px;margin:12px 0;border-radius:8px;">
-        <h3>{brief['title']} <small>({brief['incident_id']})</small></h3>
-        <p><b>Root cause:</b> {triage.get('root_cause', 'n/a')}
-           (confidence: {triage.get('confidence', 'n/a')})</p>
-        <p><b>Mitigation:</b> {mitigation['action']} &mdash; {mitigation['reason']}</p>
+        <h3>{_esc(brief['title'])} <small>({iid})</small></h3>
+        <p><b>Root cause:</b> {_esc(triage.get('root_cause', 'n/a'))}
+           (confidence: {_esc(triage.get('confidence', 'n/a'))})</p>
+        <p><b>Mitigation:</b> {_esc(mitigation['action'])} &mdash; {_esc(mitigation['reason'])}</p>
         {_evidence_table(brief['evidence'])}
         {_policy_block(brief['policy'])}
         {_durable_fix_card(brief['durable_fix'], brief['incident_id'])}
-        <p><i>Expires at:</i> {brief['expires_at']}</p>
-        <form method="post" action="/decision/{brief['incident_id']}" style="display:inline;">
+        <p><i>Expires at:</i> {_esc(brief['expires_at'])}</p>
+        <form method="post" action="/decision/{iid}" style="display:inline;">
             <input type="hidden" name="choice" value="approve">
             <button type="submit" style="background:green;color:white;">Approve</button>
         </form>
-        <form method="post" action="/decision/{brief['incident_id']}" style="display:inline;margin-left:8px;">
+        <form method="post" action="/decision/{iid}" style="display:inline;margin-left:8px;">
             <input type="hidden" name="choice" value="reject">
             <button type="submit" style="background:red;color:white;">Reject</button>
         </form>
@@ -83,8 +92,9 @@ def _brief_card(brief: dict) -> str:
 def _durable_fix_row(entry: dict) -> str:
     return f"""
     <div style="border:1px solid #ddd;padding:8px;margin:8px 0;">
-        <b>{entry['title']}</b> ({entry['incident_id']}) &mdash; {entry['action']}: {entry['description']}
-        <form method="post" action="/promote/{entry['incident_id']}" style="display:inline;margin-left:8px;">
+        <b>{_esc(entry['title'])}</b> ({_esc(entry['incident_id'])}) &mdash;
+        {_esc(entry['action'])}: {_esc(entry['description'])}
+        <form method="post" action="/promote/{_esc(entry['incident_id'])}" style="display:inline;margin-left:8px;">
             <button type="submit">Promote</button>
         </form>
     </div>

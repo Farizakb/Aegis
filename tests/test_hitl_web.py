@@ -130,6 +130,44 @@ def test_promote_unknown_id_returns_404():
     assert resp.status_code == 404
 
 
+def test_index_escapes_llm_derived_strings():
+    gate = ApprovalGate()
+    registry = DurableFixRegistry()
+    incident = make_incident(incident_id="i-xss", title="<script>alert(1)</script> incident")
+    plan = RemediationPlan(
+        mitigation=ProposedAction(action=ActionType.restart_service,
+                                  reason="<script>alert(1)</script> restart"),
+        durable_fix=ProposedAction(action=ActionType.patch_code,
+                                   reason="<script>alert(1)</script> patch",
+                                   patch="+x\n", target_file="mock_app/faults/memory_leak.py"),
+    )
+    failing_sandbox = SandboxResult(passed=False, exit_code=1, stdout="", stderr="",
+                                    duration_ms=10.0,
+                                    failure_reason="<script>alert(1)</script> failure")
+    triage = make_triage(root_cause="<script>alert(1)</script> cause")
+    brief = build_brief(incident=incident, plan=plan, sandbox=failing_sandbox,
+                        verdict=_verdict(), triage=triage, expires_at=9_999_999_999.0)
+    fut: asyncio.Future = asyncio.new_event_loop().create_future()
+    gate._pending["i-xss"] = fut
+    gate._briefs["i-xss"] = brief
+    gate._contexts["i-xss"] = {"incident": incident, "triage": triage,
+                               "durable_fix": plan.durable_fix}
+    registry.file(incident=make_incident(incident_id="i-xss-2",
+                                         title="<script>alert(2)</script> open fix"),
+                  triage=None,
+                  fix=ProposedAction(action=ActionType.patch_code,
+                                     reason="<script>alert(2)</script> desc",
+                                     patch="+x\n", target_file="mock_app/faults/db_deadlock.py"))
+
+    app = create_hitl_app(gate, registry)
+    client = TestClient(app)
+    resp = client.get("/")
+
+    assert resp.status_code == 200
+    assert "<script>" not in resp.text
+    assert "&lt;script&gt;" in resp.text
+
+
 def test_api_pending_and_durable_fixes():
     gate = ApprovalGate()
     registry = DurableFixRegistry()
