@@ -67,6 +67,7 @@ def test_escalate_is_allowed_without_sandbox_proof():
     )
     assert verdict.decision is PolicyDecision.allow
     assert verdict.violated_rules == []
+    assert verdict.reasons == ["escalate: terminal hand-off to a human"]
 
 
 # Rule 2 — sandbox proof required
@@ -142,6 +143,55 @@ def test_oversized_patch_needs_approval():
     verdict = _engine().evaluate(proposal=_patch("mock_app/main.py", lines=100),
                                  sandbox=_sandbox(), triage=_triage())
     assert "patch_size_cap" in verdict.violated_rules
+
+
+def test_patch_traversal_to_protected_path_is_blocked():
+    verdict = _engine().evaluate(proposal=_patch("mock_app/../policy/engine.py"),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+    assert "patch_protected_path" in verdict.violated_rules
+
+
+def test_patch_with_backslash_separators_is_blocked():
+    verdict = _engine().evaluate(proposal=_patch("mock_app\\..\\policy\\engine.py"),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+
+
+# Boundary values — pin deliberate comparison operators against silent flips
+def test_confidence_exactly_at_floor_is_not_a_violation():
+    verdict = _engine().evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage(confidence=0.7))
+    assert "confidence_floor" not in verdict.violated_rules
+    assert verdict.decision is PolicyDecision.allow
+
+
+def test_patch_exactly_at_size_cap_is_not_a_violation():
+    verdict = _engine().evaluate(proposal=_patch("mock_app/main.py", lines=80),
+                                 sandbox=_sandbox(), triage=_triage())
+    assert "patch_size_cap" not in verdict.violated_rules
+
+
+def test_flap_applies_at_exactly_window_edge_are_still_kept():
+    # applies at t=1000, evaluate at t=1600.0 -> cutoff=1000.0; `1000 < 1000`
+    # is False so the apply is NOT pruned -> still counts -> block.
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    for _ in range(2):
+        engine.record_apply(_restart(), PolicyDecision.allow)
+    now["t"] = 1600.0
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.block
+    assert "flap_protection" in verdict.violated_rules
+
+
+def test_flap_applies_just_past_window_edge_are_pruned():
+    now = {"t": 1000.0}
+    engine = PolicyEngine(clock=lambda: now["t"])
+    for _ in range(2):
+        engine.record_apply(_restart(), PolicyDecision.allow)
+    now["t"] = 1600.1
+    verdict = engine.evaluate(proposal=_restart(), sandbox=_sandbox(), triage=_triage())
+    assert verdict.decision is PolicyDecision.allow
 
 
 # Aggregation — all violations reported, worst decision wins

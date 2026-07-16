@@ -8,7 +8,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import httpx
 from docker.errors import NotFound
@@ -221,7 +221,11 @@ class SandboxExecutor:
     def _copy_patched_file(self, container, action: ProposedAction) -> None:
         repo_root = Path(__file__).resolve().parents[1]
         candidate = (repo_root / action.target_file).resolve()
-        if Path(action.target_file).is_absolute() or not candidate.is_relative_to(repo_root):
+        is_absolute = (
+            PurePosixPath(action.target_file).is_absolute()
+            or PureWindowsPath(action.target_file).is_absolute()
+        )
+        if is_absolute or not candidate.is_relative_to(repo_root):
             raise ValueError(f"target_file escapes repository root: {action.target_file}")
         with tempfile.TemporaryDirectory() as tmp:
             dest = Path(tmp) / action.target_file

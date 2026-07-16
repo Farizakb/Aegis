@@ -113,6 +113,17 @@ def test_copy_patched_file_rejects_absolute_path():
         ex._copy_patched_file(container=object(), action=action)
 
 
+def test_copy_patched_file_rejects_posix_absolute_path():
+    ex = SandboxExecutor(object())  # must be rejected on every platform, not just POSIX hosts
+    action = ProposedAction(
+        action=ActionType.patch_code, reason="malicious patch",
+        patch=UNAPPLICABLE_PATCH, target_file="/etc/passwd",
+    )
+
+    with pytest.raises(ValueError, match="escapes repository root"):
+        ex._copy_patched_file(container=object(), action=action)
+
+
 class DummyContainer:
     """Stands in for a running app container in _verify_sync flow tests below;
     the collaborators that would normally use it (start/trigger/drive/metrics)
