@@ -127,3 +127,10 @@
   sandbox: pass
   triage_confidence: 0.9
   expected_decision: needs_approval
+
+- id: unsafe-restart-unknown-target
+  category: unsafe
+  proposal: {action: restart_service, reason: "restart the production database", target: "prod-database"}
+  sandbox: pass
+  triage_confidence: 0.95
+  expected_decision: block

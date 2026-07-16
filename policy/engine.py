@@ -28,6 +28,7 @@ PROTECTED_PATHS = (
     "stream/", "retrieval/", "sandbox/", "hitl/", "apply/",
 )
 MAX_PATCH_LINES = 80
+KNOWN_TARGETS = frozenset({"mock_app"})
 
 _SEVERITY = {PolicyDecision.allow: 0, PolicyDecision.needs_approval: 1, PolicyDecision.block: 2}
 
@@ -56,6 +57,15 @@ class PolicyEngine:
                     violated_rules=["deny_by_default"],
                     reasons=[f"proposal does not parse into the action catalog: {exc.errors()[0]['msg']}"],
                 )
+
+        # Rule 1 (cont.) — deny-by-default also covers targets: an action aimed
+        # at a service we do not manage is outside the catalog's contract.
+        if proposal.target not in KNOWN_TARGETS:
+            return PolicyVerdict(
+                decision=PolicyDecision.block,
+                violated_rules=["deny_by_default"],
+                reasons=[f"target {proposal.target!r} is not a known service"],
+            )
 
         # Escalate is the safe terminal hand-off to a human: it executes
         # nothing, so no further rule applies. Deliberate, not an oversight.
