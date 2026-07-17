@@ -14,9 +14,11 @@ from redis.asyncio import Redis
 
 from agent.graph import build_graph
 from agent.llm import get_propose_llm, get_triage_llm
-from agent.state import AgentState, IncidentReport
-from apply.applier import PatchApplier
+from agent.report_sink import PostgresReportSink, PrintSink
+from agent.state import RemediationPlan, initial_state
+from apply.appliers import LiveApplier
 from hitl.gate import ApprovalGate
+from hitl.registry import DurableFixRegistry
 from hitl.web import create_hitl_app
 from policy.engine import PolicyEngine
 from sandbox.executor import SandboxExecutor
@@ -26,19 +28,6 @@ from stream.schema import IncidentEvent
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HITL_PORT = int(os.environ.get("HITL_PORT", "8001"))
-
-
-class PrintSink:
-    def emit(self, report: IncidentReport) -> None:
-        print(f"\n{'='*70}")
-        print(f"REPORT: {report.incident_id} -> {report.outcome.value}")
-        print(f"  retries={report.retries} sandbox_passed={report.sandbox_passed}")
-        print(f"  policy={report.policy_decision} hitl={report.hitl_choice}")
-        print(f"  tokens: in={report.total_input_tokens} out={report.total_output_tokens}")
-        print(f"  latency: {report.total_latency_ms:.0f}ms")
-        if report.applied_target_file:
-            print(f"  applied to: {report.applied_target_file}")
-        print("=" * 70)
 
 
 async def _read_latest_incidents(redis: Redis, count: int) -> list[IncidentEvent]:
@@ -75,11 +64,16 @@ async def main(count: int = 1) -> None:
     tools = await client.get_tools()
     search_tool = next(t for t in tools if t.name == "search_knowledge")
 
-    gate = ApprovalGate()
+    gate = ApprovalGate()  # HITL_TTL_S env controls the demo TTL
+    registry = DurableFixRegistry()
     executor = SandboxExecutor(docker_client)
     policy_engine = PolicyEngine()
-    applier = PatchApplier(repo_root=REPO_ROOT, backup_dir=REPO_ROOT / ".aegis_backups")
-    sink = PrintSink()
+    applier = LiveApplier(docker_client)
+    try:
+        sink = PostgresReportSink()
+    except Exception as exc:
+        print(f"Postgres unavailable ({exc}); falling back to stdout reports.")
+        sink = PrintSink()
 
     graph = build_graph(
         get_triage_llm(),
@@ -90,10 +84,11 @@ async def main(count: int = 1) -> None:
         gate,
         applier,
         sink,
+        registry,
     )
 
     # Start HITL web UI in background
-    hitl_app = create_hitl_app(gate)
+    hitl_app = create_hitl_app(gate, registry)
     config = uvicorn.Config(hitl_app, host="0.0.0.0", port=HITL_PORT, log_level="warning")
     server = uvicorn.Server(config)
     server_task = asyncio.create_task(server.serve())
@@ -102,20 +97,18 @@ async def main(count: int = 1) -> None:
     try:
         for incident in incidents:
             print(f"\nProcessing: {incident.title} ({incident.incident_id})")
-            result = await graph.ainvoke(
-                {
-                    "incident": incident,
-                    "triage": None,
-                    "retrieved_context": [],
-                    "proposed_fix": None,
-                    "retries": 0,
-                    "sandbox_result": None,
-                    "policy_verdict": None,
-                    "hitl_decision": None,
-                    "report": None,
-                    "usage": [],
-                }
-            )
+            await graph.ainvoke(initial_state(incident))
+
+        print("Waiting for durable-fix promotions (Ctrl+C to exit)...")
+        while True:
+            entry = await registry.next_promotion()
+            incident = entry["incident"]
+            print(f"\nPromoted durable fix for {incident.incident_id}")
+            await graph.ainvoke(initial_state(
+                incident,
+                plan=RemediationPlan(mitigation=entry["fix"]),
+                triage=entry["triage"],
+            ))
     finally:
         server.should_exit = True
         await server_task

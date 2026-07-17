@@ -46,6 +46,12 @@ def route_after_hitl(state: AgentState) -> str:
     return "report"
 
 
+def route_entry(state: AgentState) -> str:
+    # Promoted durable-fix runs arrive with `plan` preset: skip straight to
+    # empirical verification; everything else starts at triage.
+    return "sandbox" if state.get("plan") else "triage"
+
+
 def build_graph(
     triage_llm,
     propose_llm,
@@ -55,6 +61,7 @@ def build_graph(
     approval_gate,
     applier,
     report_sink,
+    registry,
 ) -> CompiledStateGraph:
     g = StateGraph(AgentState)
     g.add_node("triage", partial(triage_node, llm=triage_llm))
@@ -64,9 +71,9 @@ def build_graph(
     g.add_node("policy", partial(policy_node, engine=policy_engine))
     g.add_node("hitl", partial(hitl_node, gate=approval_gate))
     g.add_node("apply", partial(apply_node, applier=applier, engine=policy_engine))
-    g.add_node("report", partial(report_node, sink=report_sink))
+    g.add_node("report", partial(report_node, sink=report_sink, registry=registry))
 
-    g.add_edge(START, "triage")
+    g.add_conditional_edges(START, route_entry, {"triage": "triage", "sandbox": "sandbox"})
     g.add_edge("triage", "retrieve")
     g.add_edge("retrieve", "propose")
     g.add_edge("propose", "sandbox")
