@@ -41,7 +41,7 @@ class PrintSink:
         if report.apply_error:
             print(f"  apply_error: {report.apply_error}")
         if report.durable_fix:
-            print(f"  durable fix filed: {report.durable_fix.action.value}"
+            print(f"  durable fix drafted: {report.durable_fix.action.value}"
                   f" -> {report.durable_fix.target_file}")
         print(f"  tokens: in={report.total_input_tokens} out={report.total_output_tokens}")
         print(f"  latency: {report.total_latency_ms:.0f}ms")

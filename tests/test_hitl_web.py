@@ -119,6 +119,17 @@ def test_promote_from_pending_brief_files_then_promotes():
     assert registry.list_open() == []
 
 
+def test_decision_unknown_id_returns_404():
+    gate = ApprovalGate()
+    registry = DurableFixRegistry()
+    app = create_hitl_app(gate, registry)
+    client = TestClient(app)
+
+    resp = client.post("/decision/nope", data={"choice": "approve", "note": ""}, follow_redirects=False)
+
+    assert resp.status_code == 404
+
+
 def test_promote_unknown_id_returns_404():
     gate = ApprovalGate()
     registry = DurableFixRegistry()

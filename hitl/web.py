@@ -125,6 +125,8 @@ def create_hitl_app(gate: ApprovalGate, registry: DurableFixRegistry) -> FastAPI
     async def post_decision(incident_id: str, choice: str = Form(...), note: str = Form("")):
         if choice not in _DECIDABLE:
             raise HTTPException(status_code=400, detail="choice must be approve or reject")
+        if gate.get_context(incident_id) is None:
+            raise HTTPException(status_code=404, detail="no pending approval for this incident")
         gate.resolve(incident_id, HitlChoice(choice), note=note or None)
         return RedirectResponse(url="/", status_code=303)
 

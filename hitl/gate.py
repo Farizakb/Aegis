@@ -47,7 +47,7 @@ class ApprovalGate:
         return self._ttl_s
 
     async def request_approval(self, *, incident, plan, sandbox, verdict, triage) -> HitlDecision:
-        fut: asyncio.Future[HitlDecision] = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future[HitlDecision] = asyncio.get_running_loop().create_future()
         iid = incident.incident_id
         self._pending[iid] = fut
         self._briefs[iid] = build_brief(

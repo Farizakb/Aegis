@@ -35,6 +35,12 @@ async def _read_latest_incidents(redis: Redis, count: int) -> list[IncidentEvent
     return [IncidentEvent.model_validate_json(fields["incident"]) for _, fields in entries]
 
 
+def promoted_incident(incident: IncidentEvent) -> IncidentEvent:
+    """Derived identity for a promoted durable-fix run, so its report
+    upserts a separate row instead of overwriting the mitigation run's."""
+    return incident.model_copy(update={"incident_id": f"{incident.incident_id}#promo"})
+
+
 async def main(count: int = 1) -> None:
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
     try:
@@ -105,7 +111,7 @@ async def main(count: int = 1) -> None:
             incident = entry["incident"]
             print(f"\nPromoted durable fix for {incident.incident_id}")
             await graph.ainvoke(initial_state(
-                incident,
+                promoted_incident(incident),
                 plan=RemediationPlan(mitigation=entry["fix"]),
                 triage=entry["triage"],
             ))
