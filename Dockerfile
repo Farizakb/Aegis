@@ -8,6 +8,11 @@ COPY stream ./stream
 COPY agent ./agent
 COPY retrieval ./retrieval
 COPY tools ./tools
+COPY policy ./policy
+COPY sandbox ./sandbox
+COPY apply ./apply
+COPY hitl ./hitl
+COPY evals ./evals
 
 RUN pip install --no-cache-dir .
 

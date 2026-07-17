@@ -21,6 +21,7 @@ class FakeDocker:
     def __init__(self, container):
         self._container = container
         self.filters_seen = None
+        self.run_kwargs = None
 
         class _Containers:
             def __init__(self, outer):
@@ -30,7 +31,35 @@ class FakeDocker:
                 self._outer.filters_seen = filters
                 return [self._outer._container] if self._outer._container else []
 
+            def run(self, image, **kwargs):
+                self._outer.run_kwargs = {"image": image, **kwargs}
+                return FakeContainer()
+
         self.containers = _Containers(self)
+
+
+class FakeRollbackContainer(FakeContainer):
+    name = "aegis-app-1"
+
+    def __init__(self, host_port: str):
+        super().__init__()
+        self.removed = False
+        self.attrs = {
+            "Config": {
+                "Env": ["APP_VERSION=current", "OTHER=1"],
+                "Image": "aegis-mock-app:latest",
+                "Labels": {"com.docker.compose.service": "app"},
+            },
+            "HostConfig": {
+                "PortBindings": {
+                    "8000/tcp": [{"HostIp": "127.0.0.1", "HostPort": host_port}]
+                },
+                "NetworkMode": "aegis_default",
+            },
+        }
+
+    def remove(self, force=False):
+        self.removed = True
 
 
 def test_restart_restarts_the_labeled_container():
@@ -80,6 +109,32 @@ def test_toggle_flag_posts_disabled(monkeypatch):
                                  reason="kill", flag_name="risky_feature"))
     assert calls["url"] == "http://x:1/flags/risky_feature"
     assert calls["json"] == {"enabled": False}
+
+
+def test_rollback_preserves_ephemeral_port_binding():
+    # Docker records an ephemeral bind request as HostPort: "" — recreation
+    # must pass None (new ephemeral port), not crash on int("").
+    container = FakeRollbackContainer(host_port="")
+    docker = FakeDocker(container)
+    applier = LiveApplier(docker, service="app")
+    applier.apply(ProposedAction(action=ActionType.rollback, reason="bad deploy"))
+    assert container.removed
+    assert docker.run_kwargs["ports"] == {"8000/tcp": [("127.0.0.1", None)]}
+    env = docker.run_kwargs["environment"]
+    assert "APP_VERSION=previous" in env
+    assert "OTHER=1" in env
+    assert "APP_VERSION=current" not in env
+
+
+def test_rollback_preserves_fixed_port_binding():
+    container = FakeRollbackContainer(host_port="8000")
+    docker = FakeDocker(container)
+    LiveApplier(docker, service="app").apply(
+        ProposedAction(action=ActionType.rollback, reason="bad deploy"))
+    assert docker.run_kwargs["ports"] == {"8000/tcp": [("127.0.0.1", 8000)]}
+    assert docker.run_kwargs["image"] == "aegis-mock-app:latest"
+    assert docker.run_kwargs["name"] == "aegis-app-1"
+    assert docker.run_kwargs["network_mode"] == "aegis_default"
 
 
 def test_escalate_has_no_live_applier():

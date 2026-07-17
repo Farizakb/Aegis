@@ -76,8 +76,14 @@ class LiveApplier:
         env = [e for e in (config.get("Env") or []) if not e.startswith("APP_VERSION=")]
         env.append("APP_VERSION=previous")
         bindings = container.attrs["HostConfig"].get("PortBindings") or {}
+        # An ephemeral bind request is recorded as HostPort: "" — pass None so
+        # the recreated container gets a fresh ephemeral port instead of int('').
         ports = {
-            port: [(b.get("HostIp") or "0.0.0.0", int(b["HostPort"])) for b in binds]
+            port: [
+                (b.get("HostIp") or "0.0.0.0",
+                 int(b["HostPort"]) if b.get("HostPort") else None)
+                for b in binds
+            ]
             for port, binds in bindings.items()
         } or None
         image = config["Image"]
