@@ -68,6 +68,10 @@ services:
         condition: service_healthy
     profiles: ["tools"]
 
+  # NOTE: sandbox verification spawns sibling containers via the docker socket
+  # and probes them on host-published ports, so the fully-in-container agent
+  # is not yet supported. The supported demo path is running
+  # `python -m agent.main` on the host.
   agent:
     build: .
     command: python -m agent.main
@@ -81,6 +85,8 @@ services:
       TRIAGE_MODEL: ${TRIAGE_MODEL:-claude-haiku-4-5-20251001}
       PROPOSE_MODEL: ${PROPOSE_MODEL:-claude-sonnet-4-6}
       HITL_PORT: "8001"
+      LIVE_APP_URL: http://app:8000
+      HITL_TTL_S: "600"
     ports:
       - "8001:8001"
     volumes:

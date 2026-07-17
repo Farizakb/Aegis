@@ -279,3 +279,37 @@ def test_needs_approval_applies_do_not_count_toward_circuit():
         )
     verdict = engine.evaluate(proposal=scale, sandbox=_sandbox(), triage=_triage())
     assert verdict.decision is PolicyDecision.allow
+
+
+# Rule 1 (cont.) — deny-by-default also covers unknown targets
+def test_unknown_target_blocks_under_deny_by_default():
+    engine = PolicyEngine()
+    verdict = engine.evaluate(
+        proposal=ProposedAction(action=ActionType.restart_service,
+                                reason="restart the prod db", target="prod-database"),
+        sandbox=_sandbox(),
+        triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.block
+    assert verdict.violated_rules == ["deny_by_default"]
+
+
+def test_escalate_with_unknown_target_also_blocks():
+    # target check precedes the escalate short-circuit on purpose
+    engine = PolicyEngine()
+    verdict = engine.evaluate(
+        proposal=ProposedAction(action=ActionType.escalate, reason="help",
+                                target="prod-database"),
+        sandbox=None, triage=None,
+    )
+    assert verdict.decision is PolicyDecision.block
+
+
+def test_known_target_unaffected():
+    engine = PolicyEngine()
+    verdict = engine.evaluate(
+        proposal=ProposedAction(action=ActionType.restart_service, reason="leak",
+                                target="mock_app"),
+        sandbox=_sandbox(), triage=_triage(),
+    )
+    assert verdict.decision is PolicyDecision.allow

@@ -1,54 +1,62 @@
-"""Report node: emit a final IncidentReport summarizing the run outcome."""
+"""Report node: emit the final IncidentReport; file the durable fix (ADR-0003)."""
 
 from __future__ import annotations
 
+from agent.actions import ActionType
 from agent.state import (
-    AgentState,
-    HitlChoice,
-    IncidentReport,
-    Outcome,
-    PolicyDecision,
+    AgentState, HitlChoice, IncidentReport, Outcome, PolicyDecision,
 )
 
 
 def _determine_outcome(state: AgentState) -> Outcome:
-    hitl = state.get("hitl_decision")
-    if hitl and hitl.choice == HitlChoice.approve:
+    if state.get("applied"):
         return Outcome.applied
-    if hitl and hitl.choice == HitlChoice.reject:
+    hitl = state.get("hitl_decision")
+    if hitl and hitl.choice is HitlChoice.reject:
         return Outcome.rejected
     verdict = state.get("policy_verdict")
     if verdict and verdict.decision == PolicyDecision.block:
         return Outcome.blocked
+    # escalate action, retry exhaustion, HITL expiry, and apply failure all land here
     return Outcome.escalated
 
 
-async def report_node(state: AgentState, sink) -> dict:
+async def report_node(state: AgentState, sink, registry) -> dict:
     incident = state["incident"]
     triage = state.get("triage")
     sandbox = state.get("sandbox_result")
     verdict = state.get("policy_verdict")
     hitl = state.get("hitl_decision")
-    fix = state.get("proposed_fix")
-
-    total_in = sum(u.input_tokens for u in state.get("usage", []))
-    total_out = sum(u.output_tokens for u in state.get("usage", []))
-    total_lat = sum(u.latency_ms for u in state.get("usage", []))
+    plan = state.get("plan")
+    mitigation = plan.mitigation if plan else None
+    durable_fix = plan.durable_fix if plan else None
 
     outcome = _determine_outcome(state)
+    if durable_fix is not None and outcome is Outcome.applied:
+        registry.file(incident=incident, triage=triage, fix=durable_fix)
+
+    applied_target_file = (
+        mitigation.target_file
+        if outcome is Outcome.applied and mitigation
+        and mitigation.action is ActionType.patch_code else None
+    )
     report = IncidentReport(
         incident_id=incident.incident_id,
         fault_kind=incident.fault_kind,
         outcome=outcome,
+        mitigation_action=mitigation.action if mitigation else None,
+        attempted_actions=[a.action.action.value for a in state.get("attempted", [])],
+        durable_fix=durable_fix,
         triage_confidence=triage.confidence if triage else None,
         retries=state.get("retries", 0),
         sandbox_passed=sandbox.passed if sandbox else None,
         policy_decision=verdict.decision if verdict else None,
         hitl_choice=hitl.choice if hitl else None,
-        applied_target_file=fix.target_file if fix and outcome == Outcome.applied else None,
-        total_input_tokens=total_in,
-        total_output_tokens=total_out,
-        total_latency_ms=total_lat,
+        apply_error=state.get("apply_error"),
+        applied_target_file=applied_target_file,
+        total_input_tokens=sum(u.input_tokens for u in state.get("usage", [])),
+        total_output_tokens=sum(u.output_tokens for u in state.get("usage", [])),
+        total_latency_ms=sum(u.latency_ms for u in state.get("usage", [])),
     )
     sink.emit(report)
     return {"report": report}

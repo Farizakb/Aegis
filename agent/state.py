@@ -7,7 +7,7 @@ from typing import TypedDict
 
 from pydantic import BaseModel, Field
 
-from agent.actions import ProposedAction
+from agent.actions import ActionType, ProposedAction
 from retrieval.models import RetrievedChunk
 from stream.schema import FaultKind, IncidentEvent
 
@@ -17,12 +17,6 @@ class TriageResult(BaseModel):
     root_cause: str
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning: str
-
-
-class ProposedFix(BaseModel):
-    description: str
-    patch: str
-    target_file: str | None = None
 
 
 class RemediationPlan(BaseModel):
@@ -64,9 +58,17 @@ class PolicyVerdict(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+class AttemptRecord(BaseModel):
+    """One sandbox-verified attempt: what was tried, what the replay proved (ADR-0006)."""
+
+    action: ProposedAction
+    result: SandboxResult
+
+
 class HitlChoice(str, Enum):
     approve = "approve"
     reject = "reject"
+    expired = "expired"
 
 
 class HitlDecision(BaseModel):
@@ -86,11 +88,15 @@ class IncidentReport(BaseModel):
     incident_id: str
     fault_kind: FaultKind
     outcome: Outcome
+    mitigation_action: ActionType | None = None
+    attempted_actions: list[str] = Field(default_factory=list)
+    durable_fix: ProposedAction | None = None
     triage_confidence: float | None = None
     retries: int = 0
     sandbox_passed: bool | None = None
     policy_decision: PolicyDecision | None = None
     hitl_choice: HitlChoice | None = None
+    apply_error: str | None = None
     applied_target_file: str | None = None
     total_input_tokens: int = 0
     total_output_tokens: int = 0
@@ -101,10 +107,24 @@ class AgentState(TypedDict):
     incident: IncidentEvent
     triage: TriageResult | None
     retrieved_context: list[RetrievedChunk]
-    proposed_fix: ProposedFix | None
+    plan: RemediationPlan | None
+    attempted: list[AttemptRecord]
     retries: int
     sandbox_result: SandboxResult | None
     policy_verdict: PolicyVerdict | None
     hitl_decision: HitlDecision | None
+    applied: bool
+    apply_error: str | None
     report: IncidentReport | None
     usage: list[NodeUsage]
+
+
+def initial_state(incident: IncidentEvent, *, plan: RemediationPlan | None = None,
+                  triage: TriageResult | None = None) -> AgentState:
+    """Seed a graph run. Promoted durable-fix runs preset `plan` (and reuse the
+    original run's triage); route_entry then skips straight to sandbox."""
+    return AgentState(
+        incident=incident, triage=triage, retrieved_context=[], plan=plan,
+        attempted=[], retries=0, sandbox_result=None, policy_verdict=None,
+        hitl_decision=None, applied=False, apply_error=None, report=None, usage=[],
+    )
