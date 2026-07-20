@@ -22,4 +22,11 @@ def search_knowledge(query: str, top_k: int = 5) -> list[dict]:
 
 
 if __name__ == "__main__":
+    # Warm the embedding model on the main thread before the stdio event loop
+    # starts. Loading SentenceTransformer/torch lazily inside FastMCP's tool
+    # worker on the first request deadlocks under stdio; a startup warm-up makes
+    # search_knowledge a fast cached encode.
+    from retrieval.embeddings import get_embedder
+
+    get_embedder()
     mcp.run(transport="stdio")

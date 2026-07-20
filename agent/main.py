@@ -70,6 +70,11 @@ async def main(count: int = 1) -> None:
                 "args": ["-m", "tools.retrieval_server"],
                 "transport": "stdio",
                 "cwd": str(REPO_ROOT),
+                # Forward our environment so the stdio subprocess inherits the
+                # same POSTGRES_HOST/PORT we resolved (the MCP SDK otherwise
+                # hands the child a minimal default env, so a host-run agent's
+                # retrieval server would fall back to localhost and hang).
+                "env": {**os.environ},
             }
         }
     )
