@@ -179,6 +179,27 @@ def test_index_escapes_llm_derived_strings():
     assert "&lt;script&gt;" in resp.text
 
 
+def test_promoted_id_renders_urlencoded_action_and_resolves():
+    # A promoted run's id is "<id>#promo"; the '#' is a URL fragment delimiter,
+    # so the form action must be url-encoded or the browser drops "#promo" and
+    # posts to the base id (404). Guards the HITL approval path for promotions.
+    gate = ApprovalGate()
+    registry = DurableFixRegistry()
+    fut = _seed_pending(gate, "inc-1#promo")
+    app = create_hitl_app(gate, registry)
+    client = TestClient(app)
+
+    resp = client.get("/")
+    assert "/decision/inc-1%23promo" in resp.text
+    assert "/decision/inc-1#promo" not in resp.text
+
+    posted = client.post("/decision/inc-1%23promo", data={"choice": "approve", "note": ""},
+                         follow_redirects=False)
+    assert posted.status_code == 303
+    assert fut.done()
+    assert fut.result().choice.value == "approve"
+
+
 def test_api_pending_and_durable_fixes():
     gate = ApprovalGate()
     registry = DurableFixRegistry()

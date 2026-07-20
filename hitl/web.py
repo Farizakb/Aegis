@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -17,6 +18,13 @@ _DECIDABLE = {HitlChoice.approve.value, HitlChoice.reject.value}
 def _esc(value) -> str:
     """HTML-escape any LLM/incident-derived value before interpolation."""
     return html.escape(value if isinstance(value, str) else str(value))
+
+
+def _url_id(incident_id) -> str:
+    """URL-encode an incident id for a route path. A promoted run's id is
+    '<id>#promo'; the '#' is a URL fragment delimiter, so an un-encoded form
+    action drops it and the POST hits the wrong (base) id -> 404."""
+    return quote(str(incident_id), safe="")
 
 
 def _evidence_table(evidence: dict | None) -> str:
@@ -56,7 +64,7 @@ def _durable_fix_card(fix: dict | None, incident_id: str) -> str:
     <div style="margin-top:8px;padding:8px;background:#fafafa;">
         <b>Durable fix:</b> {_esc(fix['reason'])}<br/>
         <b>Target file:</b> {_esc(fix.get('target_file'))}
-        <form method="post" action="/promote/{_esc(incident_id)}" style="display:inline;margin-left:8px;">
+        <form method="post" action="/promote/{_url_id(incident_id)}" style="display:inline;margin-left:8px;">
             <button type="submit">Promote</button>
         </form>
     </div>
@@ -67,6 +75,7 @@ def _brief_card(brief: dict) -> str:
     triage = brief.get("triage") or {}
     mitigation = brief["mitigation"]
     iid = _esc(brief["incident_id"])
+    url_iid = _url_id(brief["incident_id"])
     return f"""
     <div style="border:1px solid #ccc;padding:16px;margin:12px 0;border-radius:8px;">
         <h3>{_esc(brief['title'])} <small>({iid})</small></h3>
@@ -77,11 +86,11 @@ def _brief_card(brief: dict) -> str:
         {_policy_block(brief['policy'])}
         {_durable_fix_card(brief['durable_fix'], brief['incident_id'])}
         <p><i>Expires at:</i> {_esc(brief['expires_at'])}</p>
-        <form method="post" action="/decision/{iid}" style="display:inline;">
+        <form method="post" action="/decision/{url_iid}" style="display:inline;">
             <input type="hidden" name="choice" value="approve">
             <button type="submit" style="background:green;color:white;">Approve</button>
         </form>
-        <form method="post" action="/decision/{iid}" style="display:inline;margin-left:8px;">
+        <form method="post" action="/decision/{url_iid}" style="display:inline;margin-left:8px;">
             <input type="hidden" name="choice" value="reject">
             <button type="submit" style="background:red;color:white;">Reject</button>
         </form>
@@ -94,7 +103,7 @@ def _durable_fix_row(entry: dict) -> str:
     <div style="border:1px solid #ddd;padding:8px;margin:8px 0;">
         <b>{_esc(entry['title'])}</b> ({_esc(entry['incident_id'])}) &mdash;
         {_esc(entry['action'])}: {_esc(entry['description'])}
-        <form method="post" action="/promote/{_esc(entry['incident_id'])}" style="display:inline;margin-left:8px;">
+        <form method="post" action="/promote/{_url_id(entry['incident_id'])}" style="display:inline;margin-left:8px;">
             <button type="submit">Promote</button>
         </form>
     </div>
