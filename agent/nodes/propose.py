@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import time
 
+from opentelemetry import trace
+
 from agent.actions import ActionType, ProposedAction
 from agent.state import AgentState, NodeUsage, RemediationPlan
+from observability.tracing import traced
 
 CHUNK_CHAR_LIMIT = 1200
 MIN_RELEVANCE_SCORE = 0.3
@@ -68,6 +71,7 @@ def _prompt(state: AgentState) -> str:
     return "\n\n".join(parts)
 
 
+@traced("graph.propose")
 async def propose_node(state: AgentState, llm) -> dict:
     structured = llm.with_structured_output(RemediationPlan, include_raw=True)
     start = time.monotonic()
@@ -91,4 +95,5 @@ async def propose_node(state: AgentState, llm) -> dict:
         output_tokens=usage_metadata.get("output_tokens", 0),
         latency_ms=latency_ms,
     )
+    trace.get_current_span().set_attribute("propose.mitigation_action", plan.mitigation.action.value)
     return {"plan": plan, "usage": state["usage"] + [usage]}

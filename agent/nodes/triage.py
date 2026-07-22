@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import time
 
+from opentelemetry import trace
+
 from agent.state import AgentState, NodeUsage, TriageResult
+from observability.tracing import traced
 from stream.schema import IncidentEvent
 
 MAX_SAMPLE_EVENTS = 5
@@ -30,6 +33,7 @@ def _prompt(incident: IncidentEvent) -> str:
     )
 
 
+@traced("graph.triage")
 async def triage_node(state: AgentState, llm) -> dict:
     structured = llm.with_structured_output(TriageResult, include_raw=True)
     start = time.monotonic()
@@ -44,4 +48,7 @@ async def triage_node(state: AgentState, llm) -> dict:
         output_tokens=usage_metadata.get("output_tokens", 0),
         latency_ms=latency_ms,
     )
-    return {"triage": response["parsed"], "usage": state["usage"] + [usage]}
+    parsed = response["parsed"]
+    if parsed is not None:
+        trace.get_current_span().set_attribute("triage.confidence", parsed.confidence)
+    return {"triage": parsed, "usage": state["usage"] + [usage]}
