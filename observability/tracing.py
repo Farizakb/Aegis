@@ -58,3 +58,33 @@ def shutdown_tracing() -> None:
 def current_trace_id() -> str | None:
     ctx = trace.get_current_span().get_span_context()
     return format(ctx.trace_id, "032x") if ctx.is_valid else None
+
+
+def traced(span_name: str):
+    """Wrap an async graph node in a span, stamping incident_id/fault_kind."""
+
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(state, *args, **kwargs):
+            with get_tracer().start_as_current_span(span_name) as span:
+                incident = state.get("incident") if isinstance(state, dict) else None
+                if incident is not None:
+                    span.set_attribute("incident_id", incident.incident_id)
+                    span.set_attribute("fault_kind", incident.fault_kind.value)
+                return await func(state, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def inject_trace_context() -> dict[str, str]:
+    """Serialize the current context into a W3C carrier (traceparent/tracestate)."""
+    carrier: dict[str, str] = {}
+    inject(carrier)
+    return carrier
+
+
+def extract_trace_context(carrier: dict):
+    """Rebuild a context from a W3C carrier read off the stream."""
+    return extract(carrier)
