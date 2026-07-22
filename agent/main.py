@@ -8,6 +8,7 @@ import os
 import sys
 from pathlib import Path
 
+import structlog
 import uvicorn
 from dotenv import load_dotenv
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -120,27 +121,35 @@ async def main(count: int = 1) -> None:
 
     try:
         for incident, carrier in incidents:
-            print(f"\nProcessing: {incident.title} ({incident.incident_id})")
-            ctx = extract_trace_context(carrier)
-            with get_tracer().start_as_current_span("agent.process", context=ctx) as span:
-                span.set_attribute("incident_id", incident.incident_id)
-                span.set_attribute("fault_kind", incident.fault_kind.value)
-                await graph.ainvoke(initial_state(incident))
+            structlog.contextvars.bind_contextvars(incident_id=incident.incident_id)
+            try:
+                print(f"\nProcessing: {incident.title} ({incident.incident_id})")
+                ctx = extract_trace_context(carrier)
+                with get_tracer().start_as_current_span("agent.process", context=ctx) as span:
+                    span.set_attribute("incident_id", incident.incident_id)
+                    span.set_attribute("fault_kind", incident.fault_kind.value)
+                    await graph.ainvoke(initial_state(incident))
+            finally:
+                structlog.contextvars.clear_contextvars()
 
         print("Waiting for durable-fix promotions (Ctrl+C to exit)...")
         while True:
             entry = await registry.next_promotion()
             incident = entry["incident"]
-            print(f"\nPromoted durable fix for {incident.incident_id}")
             promoted = promoted_incident(incident)
-            with get_tracer().start_as_current_span("agent.process") as span:
-                span.set_attribute("incident_id", promoted.incident_id)
-                span.set_attribute("fault_kind", promoted.fault_kind.value)
-                await graph.ainvoke(initial_state(
-                    promoted,
-                    plan=RemediationPlan(mitigation=entry["fix"]),
-                    triage=entry["triage"],
-                ))
+            structlog.contextvars.bind_contextvars(incident_id=promoted.incident_id)
+            try:
+                print(f"\nPromoted durable fix for {incident.incident_id}")
+                with get_tracer().start_as_current_span("agent.process") as span:
+                    span.set_attribute("incident_id", promoted.incident_id)
+                    span.set_attribute("fault_kind", promoted.fault_kind.value)
+                    await graph.ainvoke(initial_state(
+                        promoted,
+                        plan=RemediationPlan(mitigation=entry["fix"]),
+                        triage=entry["triage"],
+                    ))
+            finally:
+                structlog.contextvars.clear_contextvars()
     finally:
         server.should_exit = True
         await server_task
