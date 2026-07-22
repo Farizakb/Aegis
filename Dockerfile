@@ -12,6 +12,7 @@ COPY policy ./policy
 COPY sandbox ./sandbox
 COPY apply ./apply
 COPY hitl ./hitl
+COPY observability ./observability
 COPY evals ./evals
 
 RUN pip install --no-cache-dir .
