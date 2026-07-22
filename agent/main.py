@@ -22,6 +22,8 @@ from apply.appliers import LiveApplier
 from hitl.gate import ApprovalGate
 from hitl.registry import DurableFixRegistry
 from hitl.web import create_hitl_app
+from observability.langsmith import run_config, setup_langsmith
+from observability.tracing import current_trace_id
 from policy.engine import PolicyEngine
 from sandbox.executor import SandboxExecutor
 from stream.consumer import INCIDENTS_STREAM
@@ -54,6 +56,8 @@ def promoted_incident(incident: IncidentEvent) -> IncidentEvent:
 
 
 async def main(count: int = 1) -> None:
+    print(f"LangSmith tracing: {'enabled' if setup_langsmith() else 'disabled'}")
+
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
     try:
         incidents = await _read_latest_incidents(redis, count)
@@ -128,7 +132,10 @@ async def main(count: int = 1) -> None:
                 with get_tracer().start_as_current_span("agent.process", context=ctx) as span:
                     span.set_attribute("incident_id", incident.incident_id)
                     span.set_attribute("fault_kind", incident.fault_kind.value)
-                    await graph.ainvoke(initial_state(incident))
+                    await graph.ainvoke(
+                        initial_state(incident),
+                        config=run_config(incident, current_trace_id()),
+                    )
             finally:
                 structlog.contextvars.clear_contextvars()
 
@@ -143,11 +150,14 @@ async def main(count: int = 1) -> None:
                 with get_tracer().start_as_current_span("agent.process") as span:
                     span.set_attribute("incident_id", promoted.incident_id)
                     span.set_attribute("fault_kind", promoted.fault_kind.value)
-                    await graph.ainvoke(initial_state(
-                        promoted,
-                        plan=RemediationPlan(mitigation=entry["fix"]),
-                        triage=entry["triage"],
-                    ))
+                    await graph.ainvoke(
+                        initial_state(
+                            promoted,
+                            plan=RemediationPlan(mitigation=entry["fix"]),
+                            triage=entry["triage"],
+                        ),
+                        config=run_config(promoted, current_trace_id()),
+                    )
             finally:
                 structlog.contextvars.clear_contextvars()
     finally:
