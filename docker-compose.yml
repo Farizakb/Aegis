@@ -51,9 +51,18 @@ services:
       DEDUP_TTL_S: ${DEDUP_TTL_S:-5}
       IDLE_GAP_S: ${IDLE_GAP_S:-3}
       MAX_WINDOW_S: ${MAX_WINDOW_S:-30}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     depends_on:
       redis:
         condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"   # UI
+      - "4318:4318"     # OTLP/HTTP
 
   ingest:
     build: .
@@ -87,6 +96,7 @@ services:
       HITL_PORT: "8001"
       LIVE_APP_URL: http://app:8000
       HITL_TTL_S: "600"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
     ports:
       - "8001:8001"
     volumes:

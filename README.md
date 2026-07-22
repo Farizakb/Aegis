@@ -82,9 +82,9 @@ python -m agent.main --count 1
 
 Set `ANTHROPIC_API_KEY` in a `.env` file first (the agent loads it on startup).
 
-> **Host-run note:** when running the agent on the host (not in-container), point it at the
-> published container ports:
-> `POSTGRES_HOST=127.0.0.1`, `REDIS_URL=redis://127.0.0.1:6379/0`, `HF_HUB_OFFLINE=1`.
+> **Host-run note:** Host-run is zero-config — code defaults target the published
+> container ports. Ensure your local `.env` has **no** `POSTGRES_HOST`/`REDIS_URL`
+> lines (those belong to compose).
 
 ## Tests
 

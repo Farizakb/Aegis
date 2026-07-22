@@ -17,7 +17,7 @@ from stream.schema import FaultKind, IncidentEvent, RawEvent, Severity, from_str
 
 logger = structlog.get_logger("aegis.consumer")
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 INCIDENTS_STREAM = "aegis:incidents"
 GROUP = "aegis:agent"
 CONSUMER_NAME = os.environ.get("CONSUMER_NAME", "c1")
@@ -230,14 +230,17 @@ class Consumer:
 
 async def main() -> None:
     from observability.logging import setup_logging
+    from observability.tracing import setup_tracing, shutdown_tracing
 
     setup_logging()
+    setup_tracing("aegis-consumer")
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
     consumer = Consumer(redis, Correlator())
     try:
         await consumer.run_forever()
     finally:
         await redis.aclose()
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

@@ -23,7 +23,8 @@ from hitl.gate import ApprovalGate
 from hitl.registry import DurableFixRegistry
 from hitl.web import create_hitl_app
 from observability.langsmith import run_config, setup_langsmith
-from observability.tracing import current_trace_id
+from observability.logging import setup_logging
+from observability.tracing import current_trace_id, setup_tracing, shutdown_tracing
 from policy.engine import PolicyEngine
 from sandbox.executor import SandboxExecutor
 from stream.consumer import INCIDENTS_STREAM
@@ -34,7 +35,7 @@ from stream.schema import IncidentEvent
 # interpolates from .env. No-op if the file is absent.
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HITL_PORT = int(os.environ.get("HITL_PORT", "8001"))
 
@@ -56,6 +57,8 @@ def promoted_incident(incident: IncidentEvent) -> IncidentEvent:
 
 
 async def main(count: int = 1) -> None:
+    setup_logging()
+    setup_tracing("aegis-agent")
     print(f"LangSmith tracing: {'enabled' if setup_langsmith() else 'disabled'}")
 
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
@@ -163,6 +166,7 @@ async def main(count: int = 1) -> None:
     finally:
         server.should_exit = True
         await server_task
+        shutdown_tracing()
 
 
 if __name__ == "__main__":
