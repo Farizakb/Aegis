@@ -63,5 +63,5 @@ async def report_node(state: AgentState, sink, registry) -> dict:
         total_latency_ms=sum(u.latency_ms for u in state.get("usage", [])),
     )
     sink.emit(report)
-    trace.get_current_span().set_attribute("report.outcome", report.outcome)
+    trace.get_current_span().set_attribute("report.outcome", report.outcome.value)
     return {"report": report}

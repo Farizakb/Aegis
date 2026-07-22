@@ -26,6 +26,26 @@ async def reset_faults():
     SCALE.set_workers(2)
 
 
+@pytest.fixture(autouse=True)
+def reset_tracer_provider():
+    """Snapshot + restore the global OTel tracer provider around every test.
+
+    Observability tests point the global provider at an InMemorySpanExporter by
+    assigning ``_trace._TRACER_PROVIDER`` (and ``observability.tracing._provider``)
+    directly, bypassing OTel's set-once guard. Without this, that in-memory
+    provider leaks into later tests. For non-obs tests the snapshot equals the
+    restore, so this is a no-op.
+    """
+    import observability.tracing as _obs_tracing
+    import opentelemetry.trace as _otel_trace
+
+    saved_global = _otel_trace._TRACER_PROVIDER
+    saved_module = _obs_tracing._provider
+    yield
+    _otel_trace._TRACER_PROVIDER = saved_global
+    _obs_tracing._provider = saved_module
+
+
 @pytest.fixture
 def client(monkeypatch, fake_redis):
     monkeypatch.setattr(redis_asyncio.Redis, "from_url", classmethod(lambda cls, *a, **k: fake_redis))

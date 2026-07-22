@@ -48,7 +48,12 @@ def get_tracer() -> trace.Tracer:
 
 
 def shutdown_tracing() -> None:
-    """Force-flush + shutdown so short-lived processes export their spans."""
+    """Force-flush + shutdown so short-lived processes export their spans.
+
+    When Jaeger is absent the OTLP exporter retries with bounded backoff, so
+    this force-flush can briefly delay process exit; the exporter's abort event
+    caps that wait, so it is a bounded pause, never an indefinite hang.
+    """
     global _provider
     if _provider is not None:
         _provider.shutdown()
