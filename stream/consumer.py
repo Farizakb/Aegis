@@ -216,9 +216,16 @@ class Consumer:
             await self._redis.xack(self._events_stream, self._group, msg_id)
 
     async def _emit_incidents(self, incidents: list[IncidentEvent]) -> None:
+        from observability.tracing import get_tracer, inject_trace_context
+
         for incident in incidents:
-            logger.info("incident closed: %s", incident.model_dump_json())
-            await self._redis.xadd(self._incidents_stream, {"incident": incident.model_dump_json()})
+            with get_tracer().start_as_current_span("consumer.correlate") as span:
+                span.set_attribute("incident_id", incident.incident_id)
+                span.set_attribute("fault_kind", incident.fault_kind.value)
+                logger.info("incident closed: %s", incident.model_dump_json())
+                fields = {"incident": incident.model_dump_json()}
+                fields.update(inject_trace_context())
+                await self._redis.xadd(self._incidents_stream, fields)
 
 
 async def main() -> None:
