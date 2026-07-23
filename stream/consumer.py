@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import structlog
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
 
 from stream.producer import EVENTS_STREAM
 from stream.schema import FaultKind, IncidentEvent, RawEvent, Severity, from_stream_fields, max_severity
 
-logger = logging.getLogger("aegis.consumer")
+logger = structlog.get_logger("aegis.consumer")
 
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
 INCIDENTS_STREAM = "aegis:incidents"
 GROUP = "aegis:agent"
 CONSUMER_NAME = os.environ.get("CONSUMER_NAME", "c1")
@@ -216,19 +216,31 @@ class Consumer:
             await self._redis.xack(self._events_stream, self._group, msg_id)
 
     async def _emit_incidents(self, incidents: list[IncidentEvent]) -> None:
+        from observability.tracing import get_tracer, inject_trace_context
+
         for incident in incidents:
-            logger.info("incident closed: %s", incident.model_dump_json())
-            await self._redis.xadd(self._incidents_stream, {"incident": incident.model_dump_json()})
+            with get_tracer().start_as_current_span("consumer.correlate") as span:
+                span.set_attribute("incident_id", incident.incident_id)
+                span.set_attribute("fault_kind", incident.fault_kind.value)
+                logger.info("incident closed", incident_id=incident.incident_id)
+                fields = {"incident": incident.model_dump_json()}
+                fields.update(inject_trace_context())
+                await self._redis.xadd(self._incidents_stream, fields)
 
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    from observability.logging import setup_logging
+    from observability.tracing import setup_tracing, shutdown_tracing
+
+    setup_logging()
+    setup_tracing("aegis-consumer")
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
     consumer = Consumer(redis, Correlator())
     try:
         await consumer.run_forever()
     finally:
         await redis.aclose()
+        shutdown_tracing()
 
 
 if __name__ == "__main__":

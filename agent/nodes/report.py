@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from opentelemetry import trace
+
 from agent.actions import ActionType
 from agent.state import (
     AgentState, HitlChoice, IncidentReport, Outcome, PolicyDecision,
 )
+from observability.tracing import traced
 
 
 def _determine_outcome(state: AgentState) -> Outcome:
@@ -21,6 +24,7 @@ def _determine_outcome(state: AgentState) -> Outcome:
     return Outcome.escalated
 
 
+@traced("report.persist")
 async def report_node(state: AgentState, sink, registry) -> dict:
     incident = state["incident"]
     triage = state.get("triage")
@@ -59,4 +63,5 @@ async def report_node(state: AgentState, sink, registry) -> dict:
         total_latency_ms=sum(u.latency_ms for u in state.get("usage", [])),
     )
     sink.emit(report)
+    trace.get_current_span().set_attribute("report.outcome", report.outcome.value)
     return {"report": report}

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 
+from opentelemetry import trace
+
 from agent.state import AgentState
+from observability.tracing import get_tracer, traced
 from retrieval.models import RetrievedChunk
 
 TOP_K = 3
@@ -22,10 +25,15 @@ def _as_chunk_dict(item):
     return item
 
 
+@traced("graph.retrieve")
 async def retrieve_node(state: AgentState, search_tool) -> dict:
     incident = state["incident"]
     triage = state["triage"]
     query = f"{incident.fault_kind.value}: {triage.root_cause}" if triage else incident.summary
 
-    raw = await search_tool.ainvoke({"query": query, "top_k": TOP_K})
-    return {"retrieved_context": [RetrievedChunk(**_as_chunk_dict(chunk)) for chunk in raw]}
+    with get_tracer().start_as_current_span("mcp.search_knowledge") as span:
+        span.set_attribute("query", query)
+        raw = await search_tool.ainvoke({"query": query, "top_k": TOP_K})
+    chunks = [RetrievedChunk(**_as_chunk_dict(chunk)) for chunk in raw]
+    trace.get_current_span().set_attribute("retrieve.chunks", len(chunks))
+    return {"retrieved_context": chunks}
