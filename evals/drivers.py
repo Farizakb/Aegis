@@ -46,9 +46,9 @@ async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -
     return {
         "id": case.id,
         "fault_kind_expected": case.truth["fault_kind"],
-        "fault_kind_actual": triage.fault_kind.value,
-        "confidence": triage.confidence,
-        "root_cause_actual": triage.root_cause,
+        "fault_kind_actual": triage.fault_kind.value if triage else None,
+        "confidence": triage.confidence if triage else 0.0,
+        "root_cause_actual": triage.root_cause if triage else "",
         "mitigation_actual": plan.mitigation.action.value,
         "durable_fix_actual": durable_fix,
         "retrieved_sources": retrieved_sources,

@@ -1,6 +1,4 @@
 # tests/test_eval_driver.py
-import pytest
-
 from agent.actions import ActionType, ProposedAction
 from agent.state import RemediationPlan, TriageResult
 from evals.drivers import run_propose
@@ -62,3 +60,13 @@ async def test_driver_returns_scorable_result():
     assert r["durable_fix_actual"] == "patch_code"
     assert r["retrieved_sources"] == ["runbook:memory_leak.md"]
     assert r["acceptable_mitigations"] == ["restart_service"]
+
+
+async def test_driver_handles_triage_parse_failure():
+    plan = RemediationPlan(mitigation=ProposedAction(action=ActionType.restart_service, reason="clear"),
+                           durable_fix=ProposedAction(action=ActionType.patch_code, reason="fix",
+                                                      patch="x", target_file="mock_app/faults/mem.py"))
+    r = await run_propose(_case(), triage_llm=_FakeLLM(None), propose_llm=_FakeLLM(plan),
+                          search_tool=_FakeSearch())
+    assert r["fault_kind_actual"] is None
+    assert r["confidence"] == 0.0
