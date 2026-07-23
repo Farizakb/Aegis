@@ -1,7 +1,7 @@
 # Aegis — Self-Healing Incident-Response Agent
 
-> ⚠️ **Work in progress.** Core pipeline is built and runs end-to-end (Phases 1–4);
-> observability, evals, and the dashboard are next (Phases 5–7). This README is a
+> ⚠️ **Work in progress.** Core pipeline plus end-to-end observability are built and run
+> (Phases 1–5); the eval pyramid and dashboard are next (Phases 6–7). This README is a
 > placeholder and will be expanded when the project is complete.
 
 Aegis is an agentic system that consumes incidents off a live event stream, decides on a
@@ -60,7 +60,7 @@ each with declared safety metadata (blast radius, reversibility) that the policy
 | 2 | Sandbox fault-replay | ✅ Done |
 | 3 | Policy engine + tier-1 evals in CI | ✅ Done |
 | 4 | Agent nodes, reflective retry, live appliers, HITL, reports | ✅ Done |
-| 5 | Observability (OpenTelemetry + Jaeger + structlog) | ⏳ Next |
+| 5 | Observability (OpenTelemetry + Jaeger + structlog + LangSmith) | ✅ Done |
 | 6 | Eval pyramid + model-tiering experiment | ⏳ Planned |
 | 7 | Streamlit dashboard + writeup | ⏳ Planned |
 
@@ -69,8 +69,8 @@ each with declared safety metadata (blast radius, reversibility) that the policy
 Requires Docker Desktop and Python 3.11+.
 
 ```bash
-# 1. Bring up the stack (target app, Redis, Postgres/pgvector)
-docker compose up -d redis postgres app consumer
+# 1. Bring up the stack (target app, Redis, Postgres/pgvector, Jaeger)
+docker compose up -d redis postgres app consumer jaeger
 
 # 2. Seed the retrieval corpus (runbooks + git history)
 python -m retrieval.ingest
@@ -81,10 +81,22 @@ python -m agent.main --count 1
 ```
 
 Set `ANTHROPIC_API_KEY` in a `.env` file first (the agent loads it on startup).
+The **Jaeger UI** (one trace-waterfall per incident) serves at http://localhost:16686;
+`python -m observability.demo` triggers a fault and prints the trace URL.
 
-> **Host-run note:** Host-run is zero-config — code defaults target the published
-> container ports. Ensure your local `.env` has **no** `POSTGRES_HOST`/`REDIS_URL`
-> lines (those belong to compose).
+> **Host-run notes** (the agent runs on the host and spawns the retrieval MCP server as a
+> stdio subprocess, so a few environment details matter):
+>
+> - **Run from a real console.** Use **PowerShell**, or `winpty python -m agent.main` under
+>   Git Bash. The MCP stdio handshake is unreliable under Git Bash's *mintty* pseudo-console
+>   on Windows and fails with `McpError: Connection closed`; a real console works.
+> - **Keep `.env` hostname-free.** Host-run is zero-config — code defaults target the published
+>   container ports. Remove any `REDIS_URL`, `POSTGRES_HOST`, or `LIVE_APP_URL` lines; those are
+>   compose-only and resolve to unreachable container hostnames on the host.
+> - **Set `HF_HUB_OFFLINE=1`** once the embedding model is cached, so the retrieval server loads
+>   it offline instead of stalling on the Hugging Face Hub.
+> - LangSmith LLM tracing is optional and off by default; set `LANGCHAIN_TRACING_V2=true` **and**
+>   a `LANGCHAIN_API_KEY` to enable it (enabling the flag without a key produces 401 noise).
 
 ## Tests
 
