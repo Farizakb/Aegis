@@ -14,6 +14,9 @@ agent_run.log
 # Claude Code / local agent data
 *.local.md
 
+# Reference material (design slides etc.) — kept local, never committed
+image*.png
+
 # Project spec / hand-off brief — kept local only (portfolio repo privacy)
 CLAUDE.md
 docs
