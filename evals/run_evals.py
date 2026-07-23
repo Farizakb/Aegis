@@ -1,10 +1,11 @@
-"""Tier-1/2 evals runner (ADR-0007).
+"""Tier-1/2/3 evals runner (ADR-0007).
 
 Tier 1: seeded safe/unsafe proposals -> exact verdicts. Pure Python — no LLM, no Docker.
 Tier 2: triage + action-selection + retrieval, replayed through the graph nodes.
-Run: python evals/run_evals.py --tier 1|2
+Tier 3: proposed mitigation -> empirical fault replay in the Docker sandbox.
+Run: python evals/run_evals.py --tier 1|2|3
 Exit code 0 iff tier-1's unsafe_blocked_rate == 1.0 and verdict_accuracy == 1.0.
-Tier 2 never affects the exit code.
+Tiers 2 and 3 never affect the exit code.
 """
 
 from __future__ import annotations
@@ -207,16 +208,98 @@ def _run_tier2_cli(out_dir: str) -> None:
         conn.close()
 
 
+async def run_tier3(cases: list, *, triage_llm, propose_llm, search_tool, executor) -> list[dict]:
+    """Replay each case's proposed mitigation through the Docker sandbox and
+    score whether it empirically clears the injected fault (ADR-0002)."""
+    from evals.drivers import drive_propose
+
+    results = []
+    for case in cases:
+        result, plan = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
+                                           search_tool=search_tool)
+        sbx = await executor.verify(plan.mitigation, case.incident.fault_kind)
+        results.append({
+            "id": result["id"],
+            "mitigation_actual": result["mitigation_actual"],
+            "fault_kind": case.incident.fault_kind.value,
+            "sandbox_passed": sbx.passed,
+            "before_metrics": sbx.before_metrics,
+            "after_metrics": sbx.after_metrics,
+        })
+    return results
+
+
+def _tier3_metrics(results: list[dict]) -> dict:
+    from evals.metrics import remediation_success_rate
+
+    return {"remediation_success_rate": remediation_success_rate(results)}
+
+
+def _run_tier3_cli(out_dir: str) -> None:
+    """Graceful skip if no API key, Postgres unreachable, or Docker unreachable;
+    never touches exit code."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+        return
+
+    from evals.drivers import DirectSearchAdapter
+    from evals.fixtures import load_cases as load_tier3_cases
+    from retrieval.db import get_conn
+
+    try:
+        conn = get_conn()
+    except Exception as exc:
+        print(f"SKIPPED (Postgres unreachable: {exc})")
+        return
+
+    try:
+        import docker
+
+        try:
+            docker_client = docker.from_env()
+            docker_client.ping()
+        except Exception as exc:
+            print(f"SKIPPED (Docker unreachable: {exc})")
+            return
+
+        from agent.llm import get_propose_llm, get_triage_llm
+        from sandbox.executor import SandboxExecutor
+
+        triage_llm = get_triage_llm()
+        propose_llm = get_propose_llm()
+        search_tool = DirectSearchAdapter(conn)
+        executor = SandboxExecutor(docker_client)
+
+        cases = load_tier3_cases()
+        results = asyncio.run(run_tier3(cases, triage_llm=triage_llm, propose_llm=propose_llm,
+                                         search_tool=search_tool, executor=executor))
+        metrics = _tier3_metrics(results)
+        model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
+        path = _write_result(Path(out_dir), 3, results, metrics, model_config)
+
+        for r in results:
+            flag = "OK " if r["sandbox_passed"] else "MISS"
+            print(f"[{flag}] {r['id']}: {r['mitigation_actual']} on {r['fault_kind']}")
+        print(f"\nremediation_success_rate: {metrics['remediation_success_rate']:.0%}")
+        print(f"wrote {path}")
+    finally:
+        conn.close()
+
+
 def main() -> int:
     from evals.metrics import unsafe_blocked_rate, verdict_accuracy
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tier", choices=["1", "2"], required=True)
+    parser.add_argument("--tier", choices=["1", "2", "3"], required=True)
     parser.add_argument("--out-dir", default="evals/results")
     args = parser.parse_args()
 
     if args.tier == "2":
         _run_tier2_cli(args.out_dir)
+        return 0
+
+    if args.tier == "3":
+        _run_tier3_cli(args.out_dir)
         return 0
 
     cases = load_cases(Path(__file__).parent / "policy_cases.yaml")

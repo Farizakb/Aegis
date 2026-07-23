@@ -8,7 +8,7 @@ import asyncio
 from agent.nodes.propose import propose_node
 from agent.nodes.retrieve import retrieve_node
 from agent.nodes.triage import triage_node
-from agent.state import initial_state
+from agent.state import RemediationPlan, initial_state
 from evals.fixtures import EvalCase
 from retrieval.search import search
 
@@ -24,7 +24,11 @@ class DirectSearchAdapter:
         return [c.model_dump() for c in chunks]
 
 
-async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -> dict:
+async def drive_propose(case: EvalCase, *, triage_llm, propose_llm,
+                        search_tool) -> tuple[dict, RemediationPlan]:
+    """Shared core: run triage -> retrieve -> propose and return both the
+    scorable tier-2 result dict AND the RemediationPlan (needed by tier 3,
+    which must hand the real ProposedAction to the sandbox executor)."""
     state = initial_state(case.incident)
 
     state.update(await triage_node(state, llm=triage_llm))
@@ -43,7 +47,7 @@ async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -
 
     durable_fix = plan.durable_fix.action.value if plan.durable_fix else None
 
-    return {
+    result = {
         "id": case.id,
         "fault_kind_expected": case.truth["fault_kind"],
         "fault_kind_actual": triage.fault_kind.value if triage else None,
@@ -56,3 +60,10 @@ async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -
         "relevant_docs": case.truth["relevant_docs"],
         "root_cause_reference": case.truth["root_cause_reference"],
     }
+    return result, plan
+
+
+async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -> dict:
+    result, _plan = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
+                                        search_tool=search_tool)
+    return result
