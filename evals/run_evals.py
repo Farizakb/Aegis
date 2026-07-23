@@ -1,13 +1,18 @@
-"""Tier-1 policy evals: seeded safe/unsafe proposals -> exact verdicts (ADR-0007).
+"""Tier-1/2 evals runner (ADR-0007).
 
-Pure Python — no LLM, no Docker. Run: python evals/run_evals.py --tier 1
-Exit code 0 iff unsafe_blocked_rate == 1.0 and verdict_accuracy == 1.0.
+Tier 1: seeded safe/unsafe proposals -> exact verdicts. Pure Python — no LLM, no Docker.
+Tier 2: triage + action-selection + retrieval, replayed through the graph nodes.
+Run: python evals/run_evals.py --tier 1|2
+Exit code 0 iff tier-1's unsafe_blocked_rate == 1.0 and verdict_accuracy == 1.0.
+Tier 2 never affects the exit code.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -92,13 +97,127 @@ def _git_sha() -> str:
         return "unknown"
 
 
+def _write_result(out_dir: Path, tier: int, results: list[dict], metrics: dict,
+                   model_config: dict) -> Path:
+    """Shared results envelope for all tiers."""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "tier": tier,
+        "run_at": stamp,
+        "code_git_sha": _git_sha(),
+        "n_cases": len(results),
+        "model_config": model_config,
+        "metrics": metrics,
+        "results": results,
+    }
+    path = out / f"tier{tier}-{stamp}.json"
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+async def run_tier2(cases: list, *, triage_llm, propose_llm, search_tool) -> list[dict]:
+    """Replay each case through triage->retrieve->propose, then score with a
+    DETERMINISTIC retrieval query (locked decision Q6) so P@k/recall@k are
+    reproducible and independent of noisy triage output."""
+    from evals.drivers import run_propose
+    from evals.geval import score_root_cause
+
+    results = []
+    for case in cases:
+        result = await run_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
+                                    search_tool=search_tool)
+
+        det_query = f"{case.incident.fault_kind.value}: {case.truth['retrieval_root_cause']}"
+        det_chunks = await search_tool.ainvoke({"query": det_query, "top_k": 3})
+        seen = []
+        for c in det_chunks:
+            if c["source"] not in seen:
+                seen.append(c["source"])
+        result["retrieved_sources"] = seen
+        result["geval_score"] = score_root_cause(result["root_cause_actual"],
+                                                   case.truth["root_cause_reference"])
+        results.append(result)
+    return results
+
+
+def _tier2_metrics(results: list[dict]) -> dict:
+    from evals.metrics import (
+        action_selection_accuracy,
+        mean_confidence,
+        pct_below_confidence_floor,
+        retrieval_precision_at_k,
+        retrieval_recall_at_k,
+        triage_accuracy,
+    )
+
+    geval_scores = [r["geval_score"] for r in results if r.get("geval_score") is not None]
+
+    return {
+        "triage_accuracy": triage_accuracy(results),
+        "action_selection_accuracy": action_selection_accuracy(results),
+        "retrieval_precision_at_3": retrieval_precision_at_k(results, 3),
+        "retrieval_recall_at_3": retrieval_recall_at_k(results, 3),
+        "mean_confidence": mean_confidence(results),
+        "pct_below_confidence_floor": pct_below_confidence_floor(results),
+        "geval_mean": (sum(geval_scores) / len(geval_scores)) if geval_scores else None,
+    }
+
+
+def _run_tier2_cli(out_dir: str) -> None:
+    """Graceful skip if no API key or Postgres unreachable; never touches exit code."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+        return
+
+    from evals.drivers import DirectSearchAdapter
+    from evals.fixtures import load_cases as load_tier2_cases
+    from retrieval.db import get_conn
+
+    try:
+        conn = get_conn()
+    except Exception as exc:
+        print(f"SKIPPED (Postgres unreachable: {exc})")
+        return
+
+    try:
+        from agent.llm import get_propose_llm, get_triage_llm
+
+        triage_llm = get_triage_llm()
+        propose_llm = get_propose_llm()
+        search_tool = DirectSearchAdapter(conn)
+
+        cases = load_tier2_cases()
+        results = asyncio.run(run_tier2(cases, triage_llm=triage_llm, propose_llm=propose_llm,
+                                         search_tool=search_tool))
+        metrics = _tier2_metrics(results)
+        model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
+        path = _write_result(Path(out_dir), 2, results, metrics, model_config)
+
+        for r in results:
+            flag = "OK " if r["fault_kind_actual"] == r["fault_kind_expected"] else "MISS"
+            print(f"[{flag}] {r['id']}: expected {r['fault_kind_expected']}, got {r['fault_kind_actual']}")
+        print(f"\ntriage_accuracy:           {metrics['triage_accuracy']:.0%}")
+        print(f"action_selection_accuracy: {metrics['action_selection_accuracy']:.0%}")
+        print(f"retrieval_precision_at_3:  {metrics['retrieval_precision_at_3']:.0%}")
+        print(f"retrieval_recall_at_3:     {metrics['retrieval_recall_at_3']:.0%}")
+        print(f"wrote {path}")
+    finally:
+        conn.close()
+
+
 def main() -> int:
     from evals.metrics import unsafe_blocked_rate, verdict_accuracy
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tier", choices=["1"], required=True)
+    parser.add_argument("--tier", choices=["1", "2"], required=True)
     parser.add_argument("--out-dir", default="evals/results")
     args = parser.parse_args()
+
+    if args.tier == "2":
+        _run_tier2_cli(args.out_dir)
+        return 0
 
     cases = load_cases(Path(__file__).parent / "policy_cases.yaml")
     results = run_tier1(cases)
@@ -107,12 +226,7 @@ def main() -> int:
         "verdict_accuracy": verdict_accuracy(results),
     }
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out = Path(args.out_dir)
-    out.mkdir(parents=True, exist_ok=True)
-    payload = {"tier": 1, "run_at": stamp, "git_sha": _git_sha(),
-               "n_cases": len(results), "metrics": metrics, "results": results}
-    (out / f"tier1-{stamp}.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _write_result(Path(args.out_dir), 1, results, metrics, model_config={})
 
     for r in results:
         flag = "OK " if r["actual"] == r["expected"] else "MISS"
