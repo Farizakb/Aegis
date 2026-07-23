@@ -1,0 +1,35 @@
+{
+  "incident_id": "error_spike_04",
+  "fault_kind": "error_spike",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "5xx rate marginally elevated on mock_app",
+  "summary": "Error rate is hovering just above baseline but consistently nonzero across samples.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 2,
+  "sample_events": [
+    {
+      "event_id": "error_spike-29",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 40%",
+      "metric": 40.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:29"
+    },
+    {
+      "event_id": "error_spike-30",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 42%",
+      "metric": 42.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:30"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

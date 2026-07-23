@@ -1,0 +1,35 @@
+{
+  "incident_id": "traffic_surge_04",
+  "fault_kind": "traffic_surge",
+  "severity": "warning",
+  "source": "mock_app",
+  "title": "Latency borderline under load on mock_app",
+  "summary": "p95 latency is close to the degraded threshold but has not yet crossed it.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 1,
+  "sample_events": [
+    {
+      "event_id": "traffic_surge-37",
+      "fault_kind": "traffic_surge",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "p95 latency 130ms under load",
+      "metric": 130.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:37"
+    },
+    {
+      "event_id": "traffic_surge-38",
+      "fault_kind": "traffic_surge",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "p95 latency 135ms under load",
+      "metric": 135.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:38"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

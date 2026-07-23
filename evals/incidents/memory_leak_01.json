@@ -1,0 +1,45 @@
+{
+  "incident_id": "memory_leak_01",
+  "fault_kind": "memory_leak",
+  "severity": "critical",
+  "source": "mock_app",
+  "title": "RSS climbing on mock_app",
+  "summary": "Resident memory grows ~5MB/tick and does not plateau; RSS has crossed the critical threshold.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 3,
+  "duplicate_count": 6,
+  "sample_events": [
+    {
+      "event_id": "memory_leak-1",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=812 and rising",
+      "metric": 812.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:1"
+    },
+    {
+      "event_id": "memory_leak-2",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=817 and rising",
+      "metric": 817.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:2"
+    },
+    {
+      "event_id": "memory_leak-3",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=822 and rising",
+      "metric": 822.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:3"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

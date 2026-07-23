@@ -1,7 +1,7 @@
 from retrieval.ingest import REPO_ROOT, Document, chunk_documents, load_git_history, load_runbooks
 
 
-def test_load_runbooks_reads_all_three_fault_runbooks():
+def test_load_runbooks_reads_all_four_fault_runbooks():
     docs = load_runbooks()
 
     ids = {d.id for d in docs}
@@ -9,6 +9,7 @@ def test_load_runbooks_reads_all_three_fault_runbooks():
         "runbook:db_deadlock.md",
         "runbook:error_spike.md",
         "runbook:memory_leak.md",
+        "runbook:traffic_surge.md",
     }
     for doc in docs:
         assert doc.source == doc.id

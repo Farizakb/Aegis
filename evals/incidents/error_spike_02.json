@@ -1,0 +1,35 @@
+{
+  "incident_id": "error_spike_02",
+  "fault_kind": "error_spike",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "5xx rate elevated on mock_app, tied to risky_feature flag",
+  "summary": "Error rate rose immediately after the risky_feature flag was enabled.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 5,
+  "sample_events": [
+    {
+      "event_id": "error_spike-25",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 45%",
+      "metric": 45.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:25"
+    },
+    {
+      "event_id": "error_spike-26",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 50%",
+      "metric": 50.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:26"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

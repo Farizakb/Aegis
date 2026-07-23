@@ -1,0 +1,183 @@
+# Offline-replay incident corpus ground truth (ADR-0007).
+# Every downstream eval metric (triage, action-selection, retrieval, remediation) scores
+# against this file. `relevant_docs` uses runbook labels only (never commit SHAs — they rot).
+
+- fixture: memory_leak_01.json
+  truth:
+    fault_kind: memory_leak
+    acceptable_mitigations: [restart_service]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:memory_leak.md]
+    root_cause_reference: "Unbounded in-process buffer growth per request tick raises RSS until OOM."
+    retrieval_root_cause: "unbounded buffer growth raising RSS"
+
+- fixture: memory_leak_02.json
+  truth:
+    fault_kind: memory_leak
+    acceptable_mitigations: [restart_service]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:memory_leak.md]
+    root_cause_reference: "Unbounded in-process buffer growth per request tick raises RSS until OOM."
+    retrieval_root_cause: "unbounded buffer growth raising RSS"
+
+- fixture: memory_leak_03.json
+  truth:
+    fault_kind: memory_leak
+    acceptable_mitigations: [restart_service]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:memory_leak.md]
+    root_cause_reference: "Unbounded in-process buffer growth per request tick raises RSS until OOM."
+    retrieval_root_cause: "unbounded buffer growth raising RSS"
+
+- fixture: memory_leak_04.json
+  truth:
+    fault_kind: memory_leak
+    acceptable_mitigations: [restart_service]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:memory_leak.md]
+    root_cause_reference: "Unbounded in-process buffer growth per request tick raises RSS until OOM."
+    retrieval_root_cause: "unbounded buffer growth raising RSS"
+
+- fixture: memory_leak_05.json
+  truth:
+    fault_kind: memory_leak
+    acceptable_mitigations: [restart_service]
+    expected_durable_fix: patch_code
+    expected_policy: needs_approval
+    relevant_docs: [runbook:memory_leak.md]
+    root_cause_reference: "Unbounded in-process buffer growth per request tick raises RSS until OOM, though this short noisy window alone does not conclusively rule out transient GC activity."
+    retrieval_root_cause: "unbounded buffer growth raising RSS"
+
+- fixture: db_deadlock_01.json
+  truth:
+    fault_kind: db_deadlock
+    acceptable_mitigations: [restart_service, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:db_deadlock.md]
+    root_cause_reference: "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry."
+    retrieval_root_cause: "growing lock-wait time from unresolved deadlock"
+
+- fixture: db_deadlock_02.json
+  truth:
+    fault_kind: db_deadlock
+    acceptable_mitigations: [restart_service, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:db_deadlock.md]
+    root_cause_reference: "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry."
+    retrieval_root_cause: "growing lock-wait time from unresolved deadlock"
+
+- fixture: db_deadlock_03.json
+  truth:
+    fault_kind: db_deadlock
+    acceptable_mitigations: [restart_service, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:db_deadlock.md]
+    root_cause_reference: "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry."
+    retrieval_root_cause: "growing lock-wait time from unresolved deadlock"
+
+- fixture: db_deadlock_04.json
+  truth:
+    fault_kind: db_deadlock
+    acceptable_mitigations: [restart_service, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:db_deadlock.md]
+    root_cause_reference: "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry."
+    retrieval_root_cause: "growing lock-wait time from unresolved deadlock"
+
+- fixture: error_spike_01.json
+  truth:
+    fault_kind: error_spike
+    acceptable_mitigations: [toggle_feature_flag, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:error_spike.md]
+    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
+    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+
+- fixture: error_spike_02.json
+  truth:
+    fault_kind: error_spike
+    acceptable_mitigations: [toggle_feature_flag, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:error_spike.md]
+    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
+    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+
+- fixture: error_spike_03.json
+  truth:
+    fault_kind: error_spike
+    acceptable_mitigations: [toggle_feature_flag, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:error_spike.md]
+    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
+    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+
+- fixture: error_spike_04.json
+  truth:
+    fault_kind: error_spike
+    acceptable_mitigations: [toggle_feature_flag, rollback]
+    expected_durable_fix: patch_code
+    expected_policy: allow
+    relevant_docs: [runbook:error_spike.md]
+    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
+    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+
+- fixture: traffic_surge_01.json
+  truth:
+    fault_kind: traffic_surge
+    acceptable_mitigations: [scale_out]
+    expected_durable_fix: null
+    expected_policy: allow
+    relevant_docs: [runbook:traffic_surge.md]
+    root_cause_reference: "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect."
+    retrieval_root_cause: "capacity exhaustion, load exceeding worker pool size"
+
+- fixture: traffic_surge_02.json
+  truth:
+    fault_kind: traffic_surge
+    acceptable_mitigations: [scale_out]
+    expected_durable_fix: null
+    expected_policy: allow
+    relevant_docs: [runbook:traffic_surge.md]
+    root_cause_reference: "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect."
+    retrieval_root_cause: "capacity exhaustion, load exceeding worker pool size"
+
+- fixture: traffic_surge_03.json
+  truth:
+    fault_kind: traffic_surge
+    acceptable_mitigations: [scale_out]
+    expected_durable_fix: null
+    expected_policy: allow
+    relevant_docs: [runbook:traffic_surge.md]
+    root_cause_reference: "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect."
+    retrieval_root_cause: "capacity exhaustion, load exceeding worker pool size"
+
+- fixture: traffic_surge_04.json
+  truth:
+    fault_kind: traffic_surge
+    acceptable_mitigations: [scale_out]
+    expected_durable_fix: null
+    expected_policy: allow
+    relevant_docs: [runbook:traffic_surge.md]
+    root_cause_reference: "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect."
+    retrieval_root_cause: "capacity exhaustion, load exceeding worker pool size"
+
+- fixture: traffic_surge_05.json
+  truth:
+    fault_kind: traffic_surge
+    acceptable_mitigations: [scale_out]
+    expected_durable_fix: null
+    expected_policy: allow
+    relevant_docs: [runbook:traffic_surge.md]
+    root_cause_reference: "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect."
+    retrieval_root_cause: "capacity exhaustion, load exceeding worker pool size"

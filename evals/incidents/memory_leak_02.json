@@ -1,0 +1,45 @@
+{
+  "incident_id": "memory_leak_02",
+  "fault_kind": "memory_leak",
+  "severity": "warning",
+  "source": "mock_app",
+  "title": "RSS trending upward on mock_app",
+  "summary": "Resident memory has grown roughly 40MB over the last several ticks; still below the critical threshold.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 3,
+  "duplicate_count": 3,
+  "sample_events": [
+    {
+      "event_id": "memory_leak-4",
+      "fault_kind": "memory_leak",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "rss_mb=110 and rising",
+      "metric": 110.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:4"
+    },
+    {
+      "event_id": "memory_leak-5",
+      "fault_kind": "memory_leak",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "rss_mb=115 and rising",
+      "metric": 115.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:5"
+    },
+    {
+      "event_id": "memory_leak-6",
+      "fault_kind": "memory_leak",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "rss_mb=120 and rising",
+      "metric": 120.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:6"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

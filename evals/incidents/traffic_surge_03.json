@@ -1,0 +1,35 @@
+{
+  "incident_id": "traffic_surge_03",
+  "fault_kind": "traffic_surge",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Severe latency degradation on mock_app",
+  "summary": "p95 latency is far above baseline; the worker pool is undersized for current load.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 16,
+  "sample_events": [
+    {
+      "event_id": "traffic_surge-35",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 220ms under load",
+      "metric": 220.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:35"
+    },
+    {
+      "event_id": "traffic_surge-36",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 225ms under load",
+      "metric": 225.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:36"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

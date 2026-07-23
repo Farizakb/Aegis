@@ -1,0 +1,45 @@
+{
+  "incident_id": "memory_leak_04",
+  "fault_kind": "memory_leak",
+  "severity": "critical",
+  "source": "mock_app",
+  "title": "Memory growth resumed after brief plateau on mock_app",
+  "summary": "RSS growth paused briefly then resumed, crossing the critical threshold again on the latest tick.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 3,
+  "duplicate_count": 9,
+  "sample_events": [
+    {
+      "event_id": "memory_leak-10",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=160 and rising",
+      "metric": 160.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:10"
+    },
+    {
+      "event_id": "memory_leak-11",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=165 and rising",
+      "metric": 165.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:11"
+    },
+    {
+      "event_id": "memory_leak-12",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=170 and rising",
+      "metric": 170.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:12"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

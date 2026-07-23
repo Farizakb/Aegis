@@ -1,0 +1,35 @@
+{
+  "incident_id": "memory_leak_05",
+  "fault_kind": "memory_leak",
+  "severity": "warning",
+  "source": "mock_app",
+  "title": "Intermittent RSS fluctuation on mock_app",
+  "summary": "RSS rose then partially dipped across a noisy two-sample window; the signal is inconsistent with a monotonic leak and could plausibly be transient GC activity rather than a genuine leak.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 1,
+  "sample_events": [
+    {
+      "event_id": "memory_leak-13",
+      "fault_kind": "memory_leak",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "rss_mb=130 and rising, though the prior tick briefly dipped",
+      "metric": 130.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:13"
+    },
+    {
+      "event_id": "memory_leak-14",
+      "fault_kind": "memory_leak",
+      "severity": "warning",
+      "source": "mock_app",
+      "message": "rss_mb=125, lower than the previous tick",
+      "metric": 125.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:14"
+    }
+  ],
+  "correlation_window_s": 30.0
+}
