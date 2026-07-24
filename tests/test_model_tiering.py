@@ -70,16 +70,16 @@ async def test_run_experiment_sonnet_triage_costs_more_than_haiku(monkeypatch):
     monkeypatch.setattr(model_tiering, "get_llm", fake_get_llm)
 
     configs = [
-        {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
-         "propose_model": "claude-sonnet-4-6"},
         {"label": "triage-sonnet", "triage_model": "claude-sonnet-4-6",
+         "propose_model": "claude-sonnet-4-6"},
+        {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
          "propose_model": "claude-sonnet-4-6"},
     ]
 
     result = await model_tiering.run_experiment([_case()], configs, search_tool=_FakeSearch())
 
-    assert result["configs"][0]["label"] == "triage-haiku"
-    assert result["configs"][1]["label"] == "triage-sonnet"
+    assert result["configs"][0]["label"] == "triage-sonnet"
+    assert result["configs"][1]["label"] == "triage-haiku"
     by_label = {c["label"]: c["metrics"] for c in result["configs"]}
     for label in ("triage-haiku", "triage-sonnet"):
         assert "triage_accuracy" in by_label[label]
@@ -92,3 +92,13 @@ async def test_run_experiment_sonnet_triage_costs_more_than_haiku(monkeypatch):
     # the triage-slot model's price differs (propose is Sonnet in both) ->
     # triage-sonnet must cost strictly more than triage-haiku.
     assert by_label["triage-sonnet"]["total_cost_usd"] > by_label["triage-haiku"]["total_cost_usd"]
+
+    # comparison: baseline = triage-sonnet (configs[0]), candidate = triage-haiku
+    # (configs[1]) -> haiku is cheaper, so cost_delta_usd must be negative.
+    comparison = result["comparison"]
+    assert comparison is not None
+    assert comparison["baseline"] == "triage-sonnet"
+    assert comparison["candidate"] == "triage-haiku"
+    assert "cost_delta_usd" in comparison
+    assert "triage_accuracy_delta" in comparison
+    assert comparison["cost_delta_usd"] < 0

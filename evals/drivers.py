@@ -8,7 +8,7 @@ import asyncio
 from agent.nodes.propose import propose_node
 from agent.nodes.retrieve import retrieve_node
 from agent.nodes.triage import triage_node
-from agent.state import RemediationPlan, initial_state
+from agent.state import NodeUsage, RemediationPlan, initial_state
 from evals.fixtures import EvalCase
 from retrieval.search import search
 
@@ -25,7 +25,7 @@ class DirectSearchAdapter:
 
 
 async def drive_propose(case: EvalCase, *, triage_llm, propose_llm,
-                        search_tool) -> tuple[dict, RemediationPlan, list]:
+                        search_tool) -> tuple[dict, RemediationPlan, list[NodeUsage]]:
     """Shared core: run triage -> retrieve -> propose and return the
     scorable tier-2 result dict, the RemediationPlan (needed by tier 3,
     which must hand the real ProposedAction to the sandbox executor), AND

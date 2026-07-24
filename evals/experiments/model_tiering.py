@@ -25,9 +25,9 @@ from observability.pricing import total_cost_usd
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
 FEATURED_CONFIGS = [
-    {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
-     "propose_model": "claude-sonnet-4-6"},
     {"label": "triage-sonnet", "triage_model": "claude-sonnet-4-6",
+     "propose_model": "claude-sonnet-4-6"},
+    {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
      "propose_model": "claude-sonnet-4-6"},
 ]
 
@@ -63,10 +63,28 @@ async def run_experiment(cases, configs: list[dict], *, search_tool) -> dict:
             "metrics": metrics,
         })
 
+    comparison = None
+    if len(config_results) >= 2:
+        base_metrics = config_results[0]["metrics"]
+        cand_metrics = config_results[1]["metrics"]
+        base_cost = base_metrics["total_cost_usd"]
+        cand_cost = cand_metrics["total_cost_usd"]
+        comparison = {
+            "baseline": config_results[0]["label"],
+            "candidate": config_results[1]["label"],
+            "cost_delta_usd": cand_cost - base_cost,
+            "cost_delta_pct": ((cand_cost - base_cost) / base_cost * 100) if base_cost else None,
+            "triage_accuracy_delta": cand_metrics["triage_accuracy"] - base_metrics["triage_accuracy"],
+            "action_selection_accuracy_delta": (
+                cand_metrics["action_selection_accuracy"] - base_metrics["action_selection_accuracy"]
+            ),
+        }
+
     return {
         "run_at": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
         "code_git_sha": _git_sha(),
         "configs": config_results,
+        "comparison": comparison,
     }
 
 
@@ -106,6 +124,14 @@ def main() -> None:
             print(f"{cfg['label']:<16}{m['triage_accuracy']:<12.0%}"
                   f"{m['action_selection_accuracy']:<12.0%}"
                   f"${m['total_cost_usd']:<11.4f}{m['mean_latency_ms']:<12.1f}")
+
+        cmp = payload["comparison"]
+        if cmp:
+            pct = f"{cmp['cost_delta_pct']:+.1f}%" if cmp["cost_delta_pct"] is not None else "n/a"
+            print(f"comparison: {cmp['candidate']} vs {cmp['baseline']} -> "
+                  f"cost_delta_usd={cmp['cost_delta_usd']:+.4f} ({pct}), "
+                  f"triage_accuracy_delta={cmp['triage_accuracy_delta']:+.0%}, "
+                  f"action_selection_accuracy_delta={cmp['action_selection_accuracy_delta']:+.0%}")
         print(f"wrote {path}")
     except Exception as exc:  # report-only: never raise out of an experiment run
         print(f"[model-tiering] ERROR: {exc}")
