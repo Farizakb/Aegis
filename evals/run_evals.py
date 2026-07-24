@@ -137,8 +137,11 @@ async def run_tier2(cases: list, *, triage_llm, propose_llm, search_tool) -> lis
             if c["source"] not in seen:
                 seen.append(c["source"])
         result["retrieved_sources"] = seen
-        result["geval_score"] = score_root_cause(result["root_cause_actual"],
-                                                   case.truth["root_cause_reference"])
+        # Run the (sync, DeepEval-internal-event-loop) judge in a worker thread so it
+        # gets its own fresh event loop instead of nesting inside this async run.
+        result["geval_score"] = await asyncio.to_thread(
+            score_root_cause, result["root_cause_actual"], case.truth["root_cause_reference"]
+        )
         results.append(result)
     return results
 
@@ -146,6 +149,7 @@ async def run_tier2(cases: list, *, triage_llm, propose_llm, search_tool) -> lis
 def _tier2_metrics(results: list[dict]) -> dict:
     from evals.metrics import (
         action_selection_accuracy,
+        durable_fix_valid_path_rate,
         mean_confidence,
         pct_below_confidence_floor,
         retrieval_precision_at_k,
@@ -158,16 +162,54 @@ def _tier2_metrics(results: list[dict]) -> dict:
     return {
         "triage_accuracy": triage_accuracy(results),
         "action_selection_accuracy": action_selection_accuracy(results),
-        "retrieval_precision_at_3": retrieval_precision_at_k(results, 3),
         "retrieval_recall_at_3": retrieval_recall_at_k(results, 3),
+        "retrieval_precision_at_1": retrieval_precision_at_k(results, 1),
         "mean_confidence": mean_confidence(results),
         "pct_below_confidence_floor": pct_below_confidence_floor(results),
         "geval_mean": (sum(geval_scores) / len(geval_scores)) if geval_scores else None,
+        "durable_fix_valid_path_rate": durable_fix_valid_path_rate(results),
     }
 
 
-def _run_tier2_cli(out_dir: str) -> None:
-    """Graceful skip if no API key or Postgres unreachable; never touches exit code."""
+EXPECTED_RUNBOOK_SOURCES = [
+    "runbook:memory_leak.md",
+    "runbook:db_deadlock.md",
+    "runbook:error_spike.md",
+    "runbook:traffic_surge.md",
+]
+
+
+def _missing_runbooks(conn) -> list[str]:
+    """Reproducibility guard: which of the 4 expected fault-kind runbooks are
+    absent from the ingested `chunks` corpus. Non-fatal — callers warn and
+    continue; a missing runbook just means that fixture's recall scores 0."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT source FROM chunks WHERE source = ANY(%s)",
+            (EXPECTED_RUNBOOK_SOURCES,),
+        )
+        found = {row[0] for row in cur.fetchall()}
+    return [s for s in EXPECTED_RUNBOOK_SOURCES if s not in found]
+
+
+def _representative_cases(cases: list) -> list:
+    """First case per distinct fault_kind, preserving fixture order — the
+    default tier-3 subset (one live sandbox replay per fault kind instead of
+    all fixtures) so a routine run stays minutes, not tens of minutes."""
+    seen = set()
+    out = []
+    for c in cases:
+        fk = c.incident.fault_kind
+        if fk not in seen:
+            seen.add(fk)
+            out.append(c)
+    return out
+
+
+def _run_tier2_cli(args) -> None:
+    """Graceful skip if no API key or Postgres unreachable; never touches exit code.
+    Any OTHER runtime error during the run is caught and reported, never raised —
+    tiers 2/3 are report-only and must never abort the process."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("SKIPPED (ANTHROPIC_API_KEY not set)")
         return
@@ -183,6 +225,11 @@ def _run_tier2_cli(out_dir: str) -> None:
         return
 
     try:
+        missing = _missing_runbooks(conn)
+        if missing:
+            print(f"[tier2] WARNING: runbooks not ingested: {missing} — run "
+                  "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
+
         from agent.llm import get_propose_llm, get_triage_llm
 
         triage_llm = get_triage_llm()
@@ -194,16 +241,19 @@ def _run_tier2_cli(out_dir: str) -> None:
                                          search_tool=search_tool))
         metrics = _tier2_metrics(results)
         model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
-        path = _write_result(Path(out_dir), 2, results, metrics, model_config)
+        path = _write_result(Path(args.out_dir), 2, results, metrics, model_config)
 
         for r in results:
             flag = "OK " if r["fault_kind_actual"] == r["fault_kind_expected"] else "MISS"
             print(f"[{flag}] {r['id']}: expected {r['fault_kind_expected']}, got {r['fault_kind_actual']}")
         print(f"\ntriage_accuracy:           {metrics['triage_accuracy']:.0%}")
         print(f"action_selection_accuracy: {metrics['action_selection_accuracy']:.0%}")
-        print(f"retrieval_precision_at_3:  {metrics['retrieval_precision_at_3']:.0%}")
+        print(f"retrieval_precision_at_1:  {metrics['retrieval_precision_at_1']:.0%}")
         print(f"retrieval_recall_at_3:     {metrics['retrieval_recall_at_3']:.0%}")
         print(f"wrote {path}")
+    except Exception as exc:  # report-only: a tier run never gates the process
+        print(f"[tier2] ERROR: {exc}")
+        return
     finally:
         conn.close()
 
@@ -235,9 +285,11 @@ def _tier3_metrics(results: list[dict]) -> dict:
     return {"remediation_success_rate": remediation_success_rate(results)}
 
 
-def _run_tier3_cli(out_dir: str) -> None:
+def _run_tier3_cli(args) -> None:
     """Graceful skip if no API key, Postgres unreachable, or Docker unreachable;
-    never touches exit code."""
+    never touches exit code. Any OTHER runtime error during the run is caught and
+    reported, never raised — tiers 2/3 are report-only and must never abort the
+    process."""
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("SKIPPED (ANTHROPIC_API_KEY not set)")
         return
@@ -253,6 +305,11 @@ def _run_tier3_cli(out_dir: str) -> None:
         return
 
     try:
+        missing = _missing_runbooks(conn)
+        if missing:
+            print(f"[tier3] WARNING: runbooks not ingested: {missing} — run "
+                  "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
+
         import docker
 
         try:
@@ -271,17 +328,23 @@ def _run_tier3_cli(out_dir: str) -> None:
         executor = SandboxExecutor(docker_client)
 
         cases = load_tier3_cases()
+        cases = cases if args.tier3_all else _representative_cases(cases)
+        print(f"[tier3] running {len(cases)} case(s)"
+              + ("" if args.tier3_all else " (representative subset; use --tier3-all for all)"))
         results = asyncio.run(run_tier3(cases, triage_llm=triage_llm, propose_llm=propose_llm,
                                          search_tool=search_tool, executor=executor))
         metrics = _tier3_metrics(results)
         model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
-        path = _write_result(Path(out_dir), 3, results, metrics, model_config)
+        path = _write_result(Path(args.out_dir), 3, results, metrics, model_config)
 
         for r in results:
             flag = "OK " if r["sandbox_passed"] else "MISS"
             print(f"[{flag}] {r['id']}: {r['mitigation_actual']} on {r['fault_kind']}")
         print(f"\nremediation_success_rate: {metrics['remediation_success_rate']:.0%}")
         print(f"wrote {path}")
+    except Exception as exc:  # report-only: a tier run never gates the process
+        print(f"[tier3] ERROR: {exc}")
+        return
     finally:
         conn.close()
 
@@ -292,14 +355,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tier", choices=["1", "2", "3"], required=True)
     parser.add_argument("--out-dir", default="evals/results")
+    parser.add_argument("--tier3-all", action="store_true", default=False,
+                        help="Run all fixtures in tier 3 instead of the default "
+                             "one-per-fault-kind representative subset.")
     args = parser.parse_args()
 
     if args.tier == "2":
-        _run_tier2_cli(args.out_dir)
+        _run_tier2_cli(args)
         return 0
 
     if args.tier == "3":
-        _run_tier3_cli(args.out_dir)
+        _run_tier3_cli(args)
         return 0
 
     cases = load_cases(Path(__file__).parent / "policy_cases.yaml")

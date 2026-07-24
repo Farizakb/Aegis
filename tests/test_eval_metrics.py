@@ -1,8 +1,8 @@
 # tests/test_eval_metrics.py
 from evals.metrics import (
-    action_selection_accuracy, mean_confidence, pct_below_confidence_floor,
-    remediation_success_rate, retrieval_precision_at_k, retrieval_recall_at_k,
-    triage_accuracy,
+    action_selection_accuracy, durable_fix_valid_path_rate, mean_confidence,
+    pct_below_confidence_floor, remediation_success_rate, retrieval_precision_at_k,
+    retrieval_recall_at_k, triage_accuracy,
 )
 
 
@@ -54,3 +54,17 @@ def test_confidence_diagnostics():
     ]
     assert mean_confidence(results) == 0.7            # mean over the 2 correct only
     assert pct_below_confidence_floor(results, 0.7) == 2 / 3
+
+
+def test_durable_fix_valid_path_rate():
+    results = [
+        {"durable_fix_target_file": "evals/metrics.py"},       # real file
+        {"durable_fix_target_file": "nonexistent/nope.py"},    # missing
+        {"durable_fix_target_file": None},                     # no draft -> excluded
+    ]
+    assert durable_fix_valid_path_rate(results) == 0.5
+
+
+def test_durable_fix_valid_path_rate_none_when_no_drafts():
+    results = [{"durable_fix_target_file": None}, {}]
+    assert durable_fix_valid_path_rate(results) is None
