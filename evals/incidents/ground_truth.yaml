@@ -99,8 +99,8 @@
     expected_durable_fix: patch_code
     expected_policy: allow
     relevant_docs: [runbook:error_spike.md]
-    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
-    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+    root_cause_reference: "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state."
+    retrieval_root_cause: "5xx on /work gated by the risky_feature feature flag"
 
 - fixture: error_spike_02.json
   truth:
@@ -109,8 +109,8 @@
     expected_durable_fix: patch_code
     expected_policy: allow
     relevant_docs: [runbook:error_spike.md]
-    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
-    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+    root_cause_reference: "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state."
+    retrieval_root_cause: "5xx on /work gated by the risky_feature feature flag"
 
 - fixture: error_spike_03.json
   truth:
@@ -119,8 +119,8 @@
     expected_durable_fix: patch_code
     expected_policy: allow
     relevant_docs: [runbook:error_spike.md]
-    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
-    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+    root_cause_reference: "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state."
+    retrieval_root_cause: "5xx on /work gated by the risky_feature feature flag"
 
 - fixture: error_spike_04.json
   truth:
@@ -129,8 +129,8 @@
     expected_durable_fix: patch_code
     expected_policy: allow
     relevant_docs: [runbook:error_spike.md]
-    root_cause_reference: "A downstream dependency call fails roughly half the time with no retry, fallback, or circuit breaker protecting the caller."
-    retrieval_root_cause: "unprotected downstream calls failing at a fixed rate"
+    root_cause_reference: "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state."
+    retrieval_root_cause: "5xx on /work gated by the risky_feature feature flag"
 
 - fixture: traffic_surge_01.json
   truth:
