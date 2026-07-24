@@ -1,11 +1,12 @@
-"""Tier-1/2/3 evals runner (ADR-0007).
+"""Tier-1/2/3/4 evals runner (ADR-0007).
 
 Tier 1: seeded safe/unsafe proposals -> exact verdicts. Pure Python — no LLM, no Docker.
 Tier 2: triage + action-selection + retrieval, replayed through the graph nodes.
 Tier 3: proposed mitigation -> empirical fault replay in the Docker sandbox.
-Run: python evals/run_evals.py --tier 1|2|3
+Tier 4: 3-4 incidents through the WHOLE compiled graph with an AutoApprover -> final outcome.
+Run: python evals/run_evals.py --tier 1|2|3|4
 Exit code 0 iff tier-1's unsafe_blocked_rate == 1.0 and verdict_accuracy == 1.0.
-Tiers 2 and 3 never affect the exit code.
+Tiers 2, 3, and 4 never affect the exit code.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from agent.actions import ProposedAction  # noqa: E402
 from agent.state import PolicyDecision, SandboxResult, TriageResult  # noqa: E402
+from hitl.auto import AutoApprover  # noqa: E402
 from policy.engine import PolicyEngine  # noqa: E402
 from stream.schema import FaultKind  # noqa: E402
 
@@ -349,11 +351,126 @@ def _run_tier3_cli(args) -> None:
         conn.close()
 
 
+def _expected_outcome(expected_policy: str) -> str:
+    """Map ground-truth expected_policy -> the outcome the e2e run should land on
+    under an AutoApprover (needs_approval is always approved, so it applies too)."""
+    return {"block": "blocked", "needs_approval": "applied", "allow": "applied"}[expected_policy]
+
+
+class _NoopApplier:
+    def apply(self, action) -> None:
+        pass
+
+
+class _NoopSink:
+    def emit(self, report) -> None:
+        pass
+
+
+class _NoopRegistry:
+    def file(self, *, incident, triage, fix) -> None:
+        pass
+
+
+async def run_tier4(cases: list, *, triage_llm, propose_llm, search_tool, executor) -> list[dict]:
+    """Run each case through the WHOLE compiled graph with a real PolicyEngine
+    and an AutoApprover so the apply path runs unattended, then score the
+    final outcome against ground truth (ADR-0006's full lifecycle, tier-4 style)."""
+    from agent.graph import build_graph
+    from agent.state import initial_state
+
+    results = []
+    for case in cases:
+        graph = build_graph(
+            triage_llm, propose_llm, search_tool, executor,
+            PolicyEngine(), AutoApprover(), _NoopApplier(), _NoopSink(), _NoopRegistry(),
+        )
+        result = await graph.ainvoke(initial_state(case.incident))
+        report = result["report"]
+        results.append({
+            "id": case.id,
+            "fault_kind": case.incident.fault_kind.value,
+            "outcome_actual": report.outcome.value,
+            "outcome_expected": _expected_outcome(case.truth["expected_policy"]),
+            "policy_decision": report.policy_decision.value if report.policy_decision else None,
+            "expected_policy": case.truth["expected_policy"],
+        })
+    return results
+
+
+def _tier4_metrics(results: list[dict]) -> dict:
+    if not results:
+        return {"e2e_outcome_accuracy": 1.0}
+    matches = sum(1 for r in results if r["outcome_actual"] == r["outcome_expected"])
+    return {"e2e_outcome_accuracy": matches / len(results)}
+
+
+def _run_tier4_cli(args) -> None:
+    """Graceful skip if no API key, Postgres unreachable, or Docker unreachable;
+    never touches exit code. Any OTHER runtime error during the run is caught and
+    reported, never raised — tier 4 is report-only and must never abort the process."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+        return
+
+    from evals.drivers import DirectSearchAdapter
+    from evals.fixtures import load_cases as load_tier4_cases
+    from retrieval.db import get_conn
+
+    try:
+        conn = get_conn()
+    except Exception as exc:
+        print(f"SKIPPED (Postgres unreachable: {exc})")
+        return
+
+    try:
+        missing = _missing_runbooks(conn)
+        if missing:
+            print(f"[tier4] WARNING: runbooks not ingested: {missing} — run "
+                  "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
+
+        import docker
+
+        try:
+            docker_client = docker.from_env()
+            docker_client.ping()
+        except Exception as exc:
+            print(f"SKIPPED (Docker unreachable: {exc})")
+            return
+
+        from agent.llm import get_propose_llm, get_triage_llm
+        from sandbox.executor import SandboxExecutor
+
+        triage_llm = get_triage_llm()
+        propose_llm = get_propose_llm()
+        search_tool = DirectSearchAdapter(conn)
+        executor = SandboxExecutor(docker_client)
+
+        cases = _representative_cases(load_tier4_cases())
+        print(f"[tier4] running {len(cases)} case(s) (representative subset)")
+        results = asyncio.run(run_tier4(cases, triage_llm=triage_llm, propose_llm=propose_llm,
+                                         search_tool=search_tool, executor=executor))
+        metrics = _tier4_metrics(results)
+        model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
+        path = _write_result(Path(args.out_dir), 4, results, metrics, model_config)
+
+        for r in results:
+            flag = "OK " if r["outcome_actual"] == r["outcome_expected"] else "MISS"
+            print(f"[{flag}] {r['id']}: expected {r['outcome_expected']}, got {r['outcome_actual']}")
+        print(f"\ne2e_outcome_accuracy: {metrics['e2e_outcome_accuracy']:.0%}")
+        print(f"wrote {path}")
+    except Exception as exc:  # report-only: a tier run never gates the process
+        print(f"[tier4] ERROR: {exc}")
+        return
+    finally:
+        conn.close()
+
+
 def main() -> int:
     from evals.metrics import unsafe_blocked_rate, verdict_accuracy
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tier", choices=["1", "2", "3"], required=True)
+    parser.add_argument("--tier", choices=["1", "2", "3", "4"], required=True)
     parser.add_argument("--out-dir", default="evals/results")
     parser.add_argument("--tier3-all", action="store_true", default=False,
                         help="Run all fixtures in tier 3 instead of the default "
@@ -366,6 +483,10 @@ def main() -> int:
 
     if args.tier == "3":
         _run_tier3_cli(args)
+        return 0
+
+    if args.tier == "4":
+        _run_tier4_cli(args)
         return 0
 
     cases = load_cases(Path(__file__).parent / "policy_cases.yaml")
