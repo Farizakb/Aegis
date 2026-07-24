@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agent.actions import ProposedAction  # noqa: E402
 from agent.state import PolicyDecision, SandboxResult, TriageResult  # noqa: E402
 from hitl.auto import AutoApprover  # noqa: E402
+from observability.langsmith import experiment_env  # noqa: E402
 from policy.engine import PolicyEngine  # noqa: E402
 from stream.schema import FaultKind  # noqa: E402
 
@@ -264,6 +265,8 @@ def _run_tier2_cli(args) -> None:
         triage_llm = get_triage_llm()
         propose_llm = get_propose_llm()
         search_tool = DirectSearchAdapter(conn)
+
+        os.environ.update(experiment_env(2, {"triage": triage_llm.model, "propose": propose_llm.model}))
 
         cases = load_tier2_cases()
         results = asyncio.run(run_tier2(cases, triage_llm=triage_llm, propose_llm=propose_llm,

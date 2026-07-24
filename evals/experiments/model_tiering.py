@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from agent.llm import get_llm
 from evals.drivers import drive_propose
 from evals.metrics import action_selection_accuracy, triage_accuracy
 from evals.run_evals import _dependency_status, _git_sha
+from observability.langsmith import experiment_env
 from observability.pricing import total_cost_usd
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
@@ -113,6 +115,8 @@ def main() -> None:
         conn = get_conn()
         search_tool = DirectSearchAdapter(conn)
         cases = load_cases()
+
+        os.environ.update(experiment_env("model-tiering", {"triage": FEATURED_CONFIGS[0]["triage_model"]}))
 
         payload = asyncio.run(run_experiment(cases, FEATURED_CONFIGS, search_tool=search_tool))
         path = write_experiment(payload)
