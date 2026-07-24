@@ -250,12 +250,13 @@ def _run_tier2_cli(args) -> None:
     from evals.fixtures import load_cases as load_tier2_cases
     from retrieval.db import get_conn
 
-    conn = get_conn()
+    conn = None
 
     try:
-        missing = _missing_runbooks(conn)
-        if missing:
-            print(f"[tier2] WARNING: runbooks not ingested: {missing} — run "
+        conn = get_conn()
+        missing_rb = _missing_runbooks(conn)
+        if missing_rb:
+            print(f"[tier2] WARNING: runbooks not ingested: {missing_rb} — run "
                   "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
 
         from agent.llm import get_propose_llm, get_triage_llm
@@ -283,7 +284,8 @@ def _run_tier2_cli(args) -> None:
         print(f"[tier2] ERROR: {exc}")
         return
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 async def run_tier3(cases: list, *, triage_llm, propose_llm, search_tool, executor) -> list[dict]:
@@ -327,9 +329,10 @@ def _run_tier3_cli(args) -> None:
     from evals.fixtures import load_cases as load_tier3_cases
     from retrieval.db import get_conn
 
-    conn = get_conn()
+    conn = None
 
     try:
+        conn = get_conn()
         missing_rb = _missing_runbooks(conn)
         if missing_rb:
             print(f"[tier3] WARNING: runbooks not ingested: {missing_rb} — run "
@@ -366,7 +369,8 @@ def _run_tier3_cli(args) -> None:
         print(f"[tier3] ERROR: {exc}")
         return
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def _expected_outcome(expected_policy: str) -> str:
@@ -437,9 +441,10 @@ def _run_tier4_cli(args) -> None:
     from evals.fixtures import load_cases as load_tier4_cases
     from retrieval.db import get_conn
 
-    conn = get_conn()
+    conn = None
 
     try:
+        conn = get_conn()
         missing_rb = _missing_runbooks(conn)
         if missing_rb:
             print(f"[tier4] WARNING: runbooks not ingested: {missing_rb} — run "
@@ -474,7 +479,8 @@ def _run_tier4_cli(args) -> None:
         print(f"[tier4] ERROR: {exc}")
         return
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def _run_tier1_cli(args) -> int:
