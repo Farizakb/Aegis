@@ -208,23 +208,49 @@ def _representative_cases(cases: list) -> list:
     return out
 
 
+def _dependency_status() -> dict:
+    """Cheap, exception-swallowing probes for the optional eval dependencies,
+    used to decide tier skips in `--tier all` (and each tier's own CLI)."""
+    status = {
+        "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "postgres": False,
+        "docker": False,
+    }
+
+    try:
+        from retrieval.db import get_conn
+
+        get_conn().close()
+        status["postgres"] = True
+    except Exception:
+        pass
+
+    try:
+        import docker
+
+        docker.from_env().ping()
+        status["docker"] = True
+    except Exception:
+        pass
+
+    return status
+
+
 def _run_tier2_cli(args) -> None:
-    """Graceful skip if no API key or Postgres unreachable; never touches exit code.
+    """Graceful skip if required dependencies are unavailable; never touches exit code.
     Any OTHER runtime error during the run is caught and reported, never raised —
     tiers 2/3 are report-only and must never abort the process."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+    status = _dependency_status()
+    missing = [dep for dep in ("anthropic_key", "postgres") if not status[dep]]
+    if missing:
+        print(f"[tier2] SKIPPED (missing: {', '.join(missing)})")
         return
 
     from evals.drivers import DirectSearchAdapter
     from evals.fixtures import load_cases as load_tier2_cases
     from retrieval.db import get_conn
 
-    try:
-        conn = get_conn()
-    except Exception as exc:
-        print(f"SKIPPED (Postgres unreachable: {exc})")
-        return
+    conn = get_conn()
 
     try:
         missing = _missing_runbooks(conn)
@@ -288,38 +314,30 @@ def _tier3_metrics(results: list[dict]) -> dict:
 
 
 def _run_tier3_cli(args) -> None:
-    """Graceful skip if no API key, Postgres unreachable, or Docker unreachable;
-    never touches exit code. Any OTHER runtime error during the run is caught and
-    reported, never raised — tiers 2/3 are report-only and must never abort the
-    process."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+    """Graceful skip if required dependencies are unavailable; never touches exit
+    code. Any OTHER runtime error during the run is caught and reported, never
+    raised — tiers 2/3 are report-only and must never abort the process."""
+    status = _dependency_status()
+    missing = [dep for dep in ("anthropic_key", "postgres", "docker") if not status[dep]]
+    if missing:
+        print(f"[tier3] SKIPPED (missing: {', '.join(missing)})")
         return
 
     from evals.drivers import DirectSearchAdapter
     from evals.fixtures import load_cases as load_tier3_cases
     from retrieval.db import get_conn
 
-    try:
-        conn = get_conn()
-    except Exception as exc:
-        print(f"SKIPPED (Postgres unreachable: {exc})")
-        return
+    conn = get_conn()
 
     try:
-        missing = _missing_runbooks(conn)
-        if missing:
-            print(f"[tier3] WARNING: runbooks not ingested: {missing} — run "
+        missing_rb = _missing_runbooks(conn)
+        if missing_rb:
+            print(f"[tier3] WARNING: runbooks not ingested: {missing_rb} — run "
                   "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
 
         import docker
 
-        try:
-            docker_client = docker.from_env()
-            docker_client.ping()
-        except Exception as exc:
-            print(f"SKIPPED (Docker unreachable: {exc})")
-            return
+        docker_client = docker.from_env()
 
         from agent.llm import get_propose_llm, get_triage_llm
         from sandbox.executor import SandboxExecutor
@@ -406,37 +424,30 @@ def _tier4_metrics(results: list[dict]) -> dict:
 
 
 def _run_tier4_cli(args) -> None:
-    """Graceful skip if no API key, Postgres unreachable, or Docker unreachable;
-    never touches exit code. Any OTHER runtime error during the run is caught and
-    reported, never raised — tier 4 is report-only and must never abort the process."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("SKIPPED (ANTHROPIC_API_KEY not set)")
+    """Graceful skip if required dependencies are unavailable; never touches exit
+    code. Any OTHER runtime error during the run is caught and reported, never
+    raised — tier 4 is report-only and must never abort the process."""
+    status = _dependency_status()
+    missing = [dep for dep in ("anthropic_key", "postgres", "docker") if not status[dep]]
+    if missing:
+        print(f"[tier4] SKIPPED (missing: {', '.join(missing)})")
         return
 
     from evals.drivers import DirectSearchAdapter
     from evals.fixtures import load_cases as load_tier4_cases
     from retrieval.db import get_conn
 
-    try:
-        conn = get_conn()
-    except Exception as exc:
-        print(f"SKIPPED (Postgres unreachable: {exc})")
-        return
+    conn = get_conn()
 
     try:
-        missing = _missing_runbooks(conn)
-        if missing:
-            print(f"[tier4] WARNING: runbooks not ingested: {missing} — run "
+        missing_rb = _missing_runbooks(conn)
+        if missing_rb:
+            print(f"[tier4] WARNING: runbooks not ingested: {missing_rb} — run "
                   "`python -m retrieval.ingest`; affected fixtures will score retrieval recall 0")
 
         import docker
 
-        try:
-            docker_client = docker.from_env()
-            docker_client.ping()
-        except Exception as exc:
-            print(f"SKIPPED (Docker unreachable: {exc})")
-            return
+        docker_client = docker.from_env()
 
         from agent.llm import get_propose_llm, get_triage_llm
         from sandbox.executor import SandboxExecutor
@@ -466,28 +477,10 @@ def _run_tier4_cli(args) -> None:
         conn.close()
 
 
-def main() -> int:
+def _run_tier1_cli(args) -> int:
+    """Run tier 1 (pure Python, always runnable) and return its gate exit code:
+    0 iff unsafe_blocked_rate == 1.0 and verdict_accuracy == 1.0."""
     from evals.metrics import unsafe_blocked_rate, verdict_accuracy
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--tier", choices=["1", "2", "3", "4"], required=True)
-    parser.add_argument("--out-dir", default="evals/results")
-    parser.add_argument("--tier3-all", action="store_true", default=False,
-                        help="Run all fixtures in tier 3 instead of the default "
-                             "one-per-fault-kind representative subset.")
-    args = parser.parse_args()
-
-    if args.tier == "2":
-        _run_tier2_cli(args)
-        return 0
-
-    if args.tier == "3":
-        _run_tier3_cli(args)
-        return 0
-
-    if args.tier == "4":
-        _run_tier4_cli(args)
-        return 0
 
     cases = load_cases(Path(__file__).parent / "policy_cases.yaml")
     results = run_tier1(cases)
@@ -505,6 +498,47 @@ def main() -> int:
     print(f"verdict_accuracy:    {metrics['verdict_accuracy']:.0%}")
 
     return 0 if metrics["unsafe_blocked_rate"] == 1.0 and metrics["verdict_accuracy"] == 1.0 else 1
+
+
+def _dispatch(args) -> int:
+    """Route a parsed args namespace to the right tier(s). Tier 1 is the sole
+    exit-code gate; tiers 2-4 are report-only and never affect the return value."""
+    if args.tier == "2":
+        _run_tier2_cli(args)
+        return 0
+
+    if args.tier == "3":
+        _run_tier3_cli(args)
+        return 0
+
+    if args.tier == "4":
+        _run_tier4_cli(args)
+        return 0
+
+    if args.tier == "all":
+        status = _dependency_status()
+        print(f"[deps] anthropic_key={status['anthropic_key']} "
+              f"postgres={status['postgres']} docker={status['docker']}")
+
+        exit_code = _run_tier1_cli(args)
+        _run_tier2_cli(args)
+        _run_tier3_cli(args)
+        _run_tier4_cli(args)
+        return exit_code
+
+    return _run_tier1_cli(args)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tier", choices=["1", "2", "3", "4", "all"], required=True)
+    parser.add_argument("--out-dir", default="evals/results")
+    parser.add_argument("--tier3-all", action="store_true", default=False,
+                        help="Run all fixtures in tier 3 instead of the default "
+                             "one-per-fault-kind representative subset.")
+    args = parser.parse_args()
+
+    return _dispatch(args)
 
 
 if __name__ == "__main__":
