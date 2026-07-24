@@ -25,10 +25,12 @@ class DirectSearchAdapter:
 
 
 async def drive_propose(case: EvalCase, *, triage_llm, propose_llm,
-                        search_tool) -> tuple[dict, RemediationPlan]:
-    """Shared core: run triage -> retrieve -> propose and return both the
-    scorable tier-2 result dict AND the RemediationPlan (needed by tier 3,
-    which must hand the real ProposedAction to the sandbox executor)."""
+                        search_tool) -> tuple[dict, RemediationPlan, list]:
+    """Shared core: run triage -> retrieve -> propose and return the
+    scorable tier-2 result dict, the RemediationPlan (needed by tier 3,
+    which must hand the real ProposedAction to the sandbox executor), AND
+    the accumulated NodeUsage list (needed by cost-aware callers like the
+    model-tiering experiment)."""
     state = initial_state(case.incident)
 
     state.update(await triage_node(state, llm=triage_llm))
@@ -61,10 +63,10 @@ async def drive_propose(case: EvalCase, *, triage_llm, propose_llm,
         "relevant_docs": case.truth["relevant_docs"],
         "root_cause_reference": case.truth["root_cause_reference"],
     }
-    return result, plan
+    return result, plan, state["usage"]
 
 
 async def run_propose(case: EvalCase, *, triage_llm, propose_llm, search_tool) -> dict:
-    result, _plan = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
-                                        search_tool=search_tool)
+    result, _plan, _usages = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
+                                                  search_tool=search_tool)
     return result

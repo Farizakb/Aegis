@@ -295,8 +295,8 @@ async def run_tier3(cases: list, *, triage_llm, propose_llm, search_tool, execut
 
     results = []
     for case in cases:
-        result, plan = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
-                                           search_tool=search_tool)
+        result, plan, _usages = await drive_propose(case, triage_llm=triage_llm, propose_llm=propose_llm,
+                                                     search_tool=search_tool)
         sbx = await executor.verify(plan.mitigation, case.incident.fault_kind)
         results.append({
             "id": result["id"],

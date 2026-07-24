@@ -54,7 +54,7 @@ async def test_tier3_assembles_result(monkeypatch):
     }
 
     async def fake_drive_propose(case_, *, triage_llm, propose_llm, search_tool):
-        return result_dict, plan
+        return result_dict, plan, []
 
     monkeypatch.setattr("evals.drivers.drive_propose", fake_drive_propose)
 
