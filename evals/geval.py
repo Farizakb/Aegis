@@ -4,6 +4,12 @@ DeepEval defaults its judge to GPT-4 via OPENAI_API_KEY; we override with a
 DeepEvalBaseLLM wrapping our Haiku tier so the system stays Anthropic-only.
 Graceful skip (returns None) without deepeval installed or ANTHROPIC_API_KEY.
 """
+# NOTE: the exact DeepEval API surface below (GEval constructor kwargs,
+# DeepEvalBaseLLM.generate/a_generate call signature, metric.measure(tc))
+# is inferred from docs/source and has NOT been exercised against a real
+# `deepeval` install + live ANTHROPIC_API_KEY yet. Verify it end-to-end
+# with `pip install '.[eval]'` at the Phase-6 live checkpoint and adjust
+# if the installed version's signature differs.
 from __future__ import annotations
 
 import os
@@ -21,12 +27,6 @@ def score_root_cause(actual_reasoning: str, reference: str) -> float | None:
     if not os.environ.get("ANTHROPIC_API_KEY") or not _deepeval_available():
         return None
 
-    # NOTE: the exact DeepEval API surface below (GEval constructor kwargs,
-    # DeepEvalBaseLLM.generate/a_generate call signature, metric.measure(tc))
-    # is inferred from docs/source and has NOT been exercised against a real
-    # `deepeval` install + live ANTHROPIC_API_KEY yet. Verify it end-to-end
-    # with `pip install '.[eval]'` at the Phase-6 live checkpoint and adjust
-    # if the installed version's signature differs.
     try:
         from deepeval.metrics import GEval
         from deepeval.models import DeepEvalBaseLLM
