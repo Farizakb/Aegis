@@ -1,0 +1,47 @@
+{
+  "tier": 4,
+  "run_at": "20260725T143058Z",
+  "code_git_sha": "dc2f359",
+  "n_cases": 4,
+  "model_config": {
+    "triage": "claude-haiku-4-5-20251001",
+    "propose": "claude-sonnet-4-6"
+  },
+  "metrics": {
+    "e2e_outcome_accuracy": 1.0
+  },
+  "results": [
+    {
+      "id": "memory_leak_01",
+      "fault_kind": "memory_leak",
+      "outcome_actual": "applied",
+      "outcome_expected": "applied",
+      "policy_decision": "allow",
+      "expected_policy": "allow"
+    },
+    {
+      "id": "db_deadlock_01",
+      "fault_kind": "db_deadlock",
+      "outcome_actual": "applied",
+      "outcome_expected": "applied",
+      "policy_decision": "allow",
+      "expected_policy": "allow"
+    },
+    {
+      "id": "error_spike_01",
+      "fault_kind": "error_spike",
+      "outcome_actual": "applied",
+      "outcome_expected": "applied",
+      "policy_decision": "needs_approval",
+      "expected_policy": "allow"
+    },
+    {
+      "id": "traffic_surge_01",
+      "fault_kind": "traffic_surge",
+      "outcome_actual": "applied",
+      "outcome_expected": "applied",
+      "policy_decision": "allow",
+      "expected_policy": "allow"
+    }
+  ]
+}
