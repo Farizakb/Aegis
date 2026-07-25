@@ -102,3 +102,31 @@ async def test_run_experiment_sonnet_triage_costs_more_than_haiku(monkeypatch):
     assert "cost_delta_usd" in comparison
     assert "triage_accuracy_delta" in comparison
     assert comparison["cost_delta_usd"] < 0
+
+
+async def test_run_experiment_stores_per_case_results_and_sweep_comparisons(monkeypatch):
+    """Each config keeps a diagnosable per-case `results` list, and `comparisons`
+    holds every non-baseline config measured against configs[0] (the sweep view)."""
+    monkeypatch.setattr(model_tiering, "get_llm", lambda m: _FakeLLM(m))
+
+    configs = [
+        {"label": "all-sonnet", "triage_model": "claude-sonnet-4-6",
+         "propose_model": "claude-sonnet-4-6"},
+        {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
+         "propose_model": "claude-sonnet-4-6"},
+        {"label": "all-haiku", "triage_model": "claude-haiku-4-5-20251001",
+         "propose_model": "claude-haiku-4-5-20251001"},
+    ]
+    result = await model_tiering.run_experiment([_case()], configs, search_tool=_FakeSearch())
+
+    for cfg in result["configs"]:
+        assert len(cfg["results"]) == 1
+        rec = cfg["results"][0]
+        assert rec["id"] == "memory_leak_01"
+        assert set(rec) >= {"mitigation_actual", "acceptable_mitigations", "action_correct"}
+        # Fake plan mitigates with restart_service, which is in acceptable_mitigations.
+        assert rec["action_correct"] is True
+
+    # comparisons: every config after configs[0], each measured vs the baseline.
+    assert [c["candidate"] for c in result["comparisons"]] == ["triage-haiku", "all-haiku"]
+    assert all(c["baseline"] == "all-sonnet" for c in result["comparisons"])

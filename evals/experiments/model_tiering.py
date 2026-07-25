@@ -1,12 +1,19 @@
 """Model-tiering experiment: compare per-node model choices on accuracy and
-cost (ADR-0010). Featured comparison (see `main`): triage Haiku vs Sonnet,
-propose held at Sonnet — proves a cheaper triage model doesn't cost triage
-accuracy while cutting $ per incident.
+cost (ADR-0010). Sweeps the 2x2 grid over {triage, propose} x {Sonnet, Haiku}
+(see `FEATURED_CONFIGS`), with `all-sonnet` as the most-capable baseline. Each
+cheaper config is compared to that baseline in `comparisons`; the singular
+`comparison` keeps the headline pair (baseline vs the spec-default triage-haiku).
+
+Every config keeps a trimmed per-case `results` list so the artifact is
+self-verifying — a reviewer can see exactly WHICH incident's action selection
+differs between configs, rather than trusting a bare aggregate delta.
 
 Note: `mean_latency_ms` is environment-dependent (network conditions, API
 load) and NOT reproducible across runs. `total_cost_usd` is a deterministic
 function of token counts and the static pricing table (observability/pricing.py),
-so it IS reproducible and is the metric the headline claim rests on.
+so it IS reproducible and is the metric the headline claim rests on. Accuracy
+deltas are single-run and can sit within sampling noise (n=18) — read the
+per-case `results` before treating a small delta as a real regression.
 """
 
 from __future__ import annotations
@@ -26,12 +33,48 @@ from observability.pricing import total_cost_usd
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 
+SONNET = "claude-sonnet-4-6"
+HAIKU = "claude-haiku-4-5-20251001"
+
+# The 2x2 grid. Order matters: configs[0] (all-sonnet) is the most-capable
+# baseline every other config is compared against; configs[1] (triage-haiku,
+# the spec default) is the singular `comparison`'s headline candidate.
 FEATURED_CONFIGS = [
-    {"label": "triage-sonnet", "triage_model": "claude-sonnet-4-6",
-     "propose_model": "claude-sonnet-4-6"},
-    {"label": "triage-haiku", "triage_model": "claude-haiku-4-5-20251001",
-     "propose_model": "claude-sonnet-4-6"},
+    {"label": "all-sonnet", "triage_model": SONNET, "propose_model": SONNET},
+    {"label": "triage-haiku", "triage_model": HAIKU, "propose_model": SONNET},
+    {"label": "propose-haiku", "triage_model": SONNET, "propose_model": HAIKU},
+    {"label": "all-haiku", "triage_model": HAIKU, "propose_model": HAIKU},
 ]
+
+
+def _case_record(r: dict) -> dict:
+    """Trimmed per-case row for the artifact: enough to see WHICH incident's
+    action selection differs between configs, without dumping full reasoning."""
+    return {
+        "id": r["id"],
+        "fault_kind_actual": r["fault_kind_actual"],
+        "confidence": r["confidence"],
+        "mitigation_actual": r["mitigation_actual"],
+        "acceptable_mitigations": r["acceptable_mitigations"],
+        "action_correct": r["mitigation_actual"] in r["acceptable_mitigations"],
+    }
+
+
+def _compare(base: dict, cand: dict) -> dict:
+    """Delta of a candidate config against the baseline. cost_delta is the
+    reproducible headline; accuracy deltas are single-run (may be noise)."""
+    bm, cm = base["metrics"], cand["metrics"]
+    base_cost, cand_cost = bm["total_cost_usd"], cm["total_cost_usd"]
+    return {
+        "baseline": base["label"],
+        "candidate": cand["label"],
+        "cost_delta_usd": cand_cost - base_cost,
+        "cost_delta_pct": ((cand_cost - base_cost) / base_cost * 100) if base_cost else None,
+        "triage_accuracy_delta": cm["triage_accuracy"] - bm["triage_accuracy"],
+        "action_selection_accuracy_delta": (
+            cm["action_selection_accuracy"] - bm["action_selection_accuracy"]
+        ),
+    }
 
 
 async def run_experiment(cases, configs: list[dict], *, search_tool) -> dict:
@@ -63,30 +106,20 @@ async def run_experiment(cases, configs: list[dict], *, search_tool) -> dict:
             "triage_model": cfg["triage_model"],
             "propose_model": cfg["propose_model"],
             "metrics": metrics,
+            "results": [_case_record(r) for r in results],
         })
 
-    comparison = None
-    if len(config_results) >= 2:
-        base_metrics = config_results[0]["metrics"]
-        cand_metrics = config_results[1]["metrics"]
-        base_cost = base_metrics["total_cost_usd"]
-        cand_cost = cand_metrics["total_cost_usd"]
-        comparison = {
-            "baseline": config_results[0]["label"],
-            "candidate": config_results[1]["label"],
-            "cost_delta_usd": cand_cost - base_cost,
-            "cost_delta_pct": ((cand_cost - base_cost) / base_cost * 100) if base_cost else None,
-            "triage_accuracy_delta": cand_metrics["triage_accuracy"] - base_metrics["triage_accuracy"],
-            "action_selection_accuracy_delta": (
-                cand_metrics["action_selection_accuracy"] - base_metrics["action_selection_accuracy"]
-            ),
-        }
+    # Singular `comparison` = baseline vs the first candidate (headline pair);
+    # `comparisons` = every non-baseline config vs the baseline (the full sweep).
+    comparison = _compare(config_results[0], config_results[1]) if len(config_results) >= 2 else None
+    comparisons = [_compare(config_results[0], c) for c in config_results[1:]]
 
     return {
         "run_at": datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
         "code_git_sha": _git_sha(),
         "configs": config_results,
         "comparison": comparison,
+        "comparisons": comparisons,
     }
 
 
@@ -129,13 +162,12 @@ def main() -> None:
                   f"{m['action_selection_accuracy']:<12.0%}"
                   f"${m['total_cost_usd']:<11.4f}{m['mean_latency_ms']:<12.1f}")
 
-        cmp = payload["comparison"]
-        if cmp:
+        for cmp in payload["comparisons"]:
             pct = f"{cmp['cost_delta_pct']:+.1f}%" if cmp["cost_delta_pct"] is not None else "n/a"
-            print(f"comparison: {cmp['candidate']} vs {cmp['baseline']} -> "
-                  f"cost_delta_usd={cmp['cost_delta_usd']:+.4f} ({pct}), "
-                  f"triage_accuracy_delta={cmp['triage_accuracy_delta']:+.0%}, "
-                  f"action_selection_accuracy_delta={cmp['action_selection_accuracy_delta']:+.0%}")
+            print(f"{cmp['candidate']:<14} vs {cmp['baseline']}: "
+                  f"cost {cmp['cost_delta_usd']:+.4f} ({pct}), "
+                  f"triage_acc {cmp['triage_accuracy_delta']:+.0%}, "
+                  f"action_acc {cmp['action_selection_accuracy_delta']:+.0%}")
         print(f"wrote {path}")
     except Exception as exc:  # report-only: never raise out of an experiment run
         print(f"[model-tiering] ERROR: {exc}")

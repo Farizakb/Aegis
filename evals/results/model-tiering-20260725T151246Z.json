@@ -1,0 +1,844 @@
+{
+  "run_at": "20260725T151246Z",
+  "code_git_sha": "2c49b83",
+  "configs": [
+    {
+      "label": "all-sonnet",
+      "triage_model": "claude-sonnet-4-6",
+      "propose_model": "claude-sonnet-4-6",
+      "metrics": {
+        "triage_accuracy": 1.0,
+        "action_selection_accuracy": 1.0,
+        "total_cost_usd": 0.464805,
+        "mean_latency_ms": 10762.272883319787
+      },
+      "results": [
+        {
+          "id": "memory_leak_01",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.93,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_02",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.72,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_03",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.93,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_04",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.91,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_05",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.25,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_01",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.91,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_02",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_03",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.74,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_04",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_01",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_02",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.93,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_03",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_04",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.72,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_01",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.72,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_02",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.78,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_03",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.88,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_04",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.72,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_05",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.82,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        }
+      ]
+    },
+    {
+      "label": "triage-haiku",
+      "triage_model": "claude-haiku-4-5-20251001",
+      "propose_model": "claude-sonnet-4-6",
+      "metrics": {
+        "triage_accuracy": 1.0,
+        "action_selection_accuracy": 1.0,
+        "total_cost_usd": 0.319318,
+        "mean_latency_ms": 7982.079744432768
+      },
+      "results": [
+        {
+          "id": "memory_leak_01",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_02",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.75,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_03",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_04",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_05",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.25,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_01",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_02",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_03",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.82,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_04",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.95,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_01",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.65,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_02",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_03",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.65,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_04",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.65,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_01",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.85,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_02",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.75,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_03",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.95,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_04",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.75,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_05",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.85,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        }
+      ]
+    },
+    {
+      "label": "propose-haiku",
+      "triage_model": "claude-sonnet-4-6",
+      "propose_model": "claude-haiku-4-5-20251001",
+      "metrics": {
+        "triage_accuracy": 1.0,
+        "action_selection_accuracy": 1.0,
+        "total_cost_usd": 0.274007,
+        "mean_latency_ms": 8513.580875002339
+      },
+      "results": [
+        {
+          "id": "memory_leak_01",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_02",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.72,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_03",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.93,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_04",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.91,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_05",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.3,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_01",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.91,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_02",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.91,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_03",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.82,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_04",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_01",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_02",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.93,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_03",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_04",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.74,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_01",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.72,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_02",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.82,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_03",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.87,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_04",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.72,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_05",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.82,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        }
+      ]
+    },
+    {
+      "label": "all-haiku",
+      "triage_model": "claude-haiku-4-5-20251001",
+      "propose_model": "claude-haiku-4-5-20251001",
+      "metrics": {
+        "triage_accuracy": 1.0,
+        "action_selection_accuracy": 1.0,
+        "total_cost_usd": 0.120204,
+        "mean_latency_ms": 3740.9902972156287
+      },
+      "results": [
+        {
+          "id": "memory_leak_01",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_02",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.72,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_03",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_04",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "memory_leak_05",
+          "fault_kind_actual": "memory_leak",
+          "confidence": 0.15,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_01",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_02",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.85,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_03",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.75,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "db_deadlock_04",
+          "fault_kind_actual": "db_deadlock",
+          "confidence": 0.92,
+          "mitigation_actual": "restart_service",
+          "acceptable_mitigations": [
+            "restart_service",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_01",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.75,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_02",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.92,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_03",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.85,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "error_spike_04",
+          "fault_kind_actual": "error_spike",
+          "confidence": 0.65,
+          "mitigation_actual": "toggle_feature_flag",
+          "acceptable_mitigations": [
+            "toggle_feature_flag",
+            "rollback"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_01",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.75,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_02",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.75,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_03",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.92,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_04",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.85,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        },
+        {
+          "id": "traffic_surge_05",
+          "fault_kind_actual": "traffic_surge",
+          "confidence": 0.85,
+          "mitigation_actual": "scale_out",
+          "acceptable_mitigations": [
+            "scale_out"
+          ],
+          "action_correct": true
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "baseline": "all-sonnet",
+    "candidate": "triage-haiku",
+    "cost_delta_usd": -0.14548700000000003,
+    "cost_delta_pct": -31.300652961994818,
+    "triage_accuracy_delta": 0.0,
+    "action_selection_accuracy_delta": 0.0
+  },
+  "comparisons": [
+    {
+      "baseline": "all-sonnet",
+      "candidate": "triage-haiku",
+      "cost_delta_usd": -0.14548700000000003,
+      "cost_delta_pct": -31.300652961994818,
+      "triage_accuracy_delta": 0.0,
+      "action_selection_accuracy_delta": 0.0
+    },
+    {
+      "baseline": "all-sonnet",
+      "candidate": "propose-haiku",
+      "cost_delta_usd": -0.19079800000000002,
+      "cost_delta_pct": -41.04904207140629,
+      "triage_accuracy_delta": 0.0,
+      "action_selection_accuracy_delta": 0.0
+    },
+    {
+      "baseline": "all-sonnet",
+      "candidate": "all-haiku",
+      "cost_delta_usd": -0.34460100000000005,
+      "cost_delta_pct": -74.13883241359281,
+      "triage_accuracy_delta": 0.0,
+      "action_selection_accuracy_delta": 0.0
+    }
+  ]
+}
