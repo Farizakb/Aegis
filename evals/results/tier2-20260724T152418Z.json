@@ -1,0 +1,408 @@
+{
+  "tier": 2,
+  "run_at": "20260724T152418Z",
+  "code_git_sha": "2a9712b",
+  "n_cases": 18,
+  "model_config": {
+    "triage": "claude-haiku-4-5-20251001",
+    "propose": "claude-sonnet-4-6"
+  },
+  "metrics": {
+    "triage_accuracy": 1.0,
+    "action_selection_accuracy": 1.0,
+    "retrieval_recall_at_3": 1.0,
+    "retrieval_precision_at_1": 1.0,
+    "mean_confidence": 0.8022222222222222,
+    "pct_below_confidence_floor": 0.16666666666666666,
+    "geval_mean": 0.4,
+    "durable_fix_valid_path_rate": 1.0
+  },
+  "results": [
+    {
+      "id": "memory_leak_01",
+      "fault_kind_expected": "memory_leak",
+      "fault_kind_actual": "memory_leak",
+      "confidence": 0.85,
+      "root_cause_actual": "Uncontrolled object accumulation in mock_app causing continuous RSS growth at ~5MB per tick. Most likely causes: unbounded cache/collection growth, repeated object allocation without corresponding deallocation, or accumulation of temporary objects that are not being garbage collected.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/memory_leak.py",
+      "retrieved_sources": [
+        "runbook:memory_leak.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service"
+      ],
+      "relevant_docs": [
+        "runbook:memory_leak.md"
+      ],
+      "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
+      "geval_score": 0.7
+    },
+    {
+      "id": "memory_leak_02",
+      "fault_kind_expected": "memory_leak",
+      "fault_kind_actual": "memory_leak",
+      "confidence": 0.75,
+      "root_cause_actual": "Potential memory leak in mock_app causing RSS to increase by ~40MB over 30 seconds (10-13MB/s growth rate). The resident memory is trending upward at a concerning rate, indicating either unreleased object allocations, accumulated cache growth, or a resource handle not being properly freed during normal operation.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/memory_leak.py",
+      "retrieved_sources": [
+        "runbook:memory_leak.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service"
+      ],
+      "relevant_docs": [
+        "runbook:memory_leak.md"
+      ],
+      "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
+      "geval_score": 0.3
+    },
+    {
+      "id": "memory_leak_03",
+      "fault_kind_expected": "memory_leak",
+      "fault_kind_actual": "memory_leak",
+      "confidence": 0.85,
+      "root_cause_actual": "Unmanaged memory allocation in mock_app - likely a memory leak in application code where allocated memory is not being properly deallocated during normal operation. The sustained RSS growth over a 30-second window (905MB \u2192 915MB) indicates continuous memory accumulation without corresponding garbage collection or deallocation cycles.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/memory_leak.py",
+      "retrieved_sources": [
+        "runbook:memory_leak.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service"
+      ],
+      "relevant_docs": [
+        "runbook:memory_leak.md"
+      ],
+      "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
+      "geval_score": 0.3
+    },
+    {
+      "id": "memory_leak_04",
+      "fault_kind_expected": "memory_leak",
+      "fault_kind_actual": "memory_leak",
+      "confidence": 0.85,
+      "root_cause_actual": "Uncontrolled memory accumulation in mock_app process. RSS growth pattern shows brief stabilization followed by resumed increase, indicating either: (1) intermittent object allocation without corresponding deallocation, (2) cache or buffer that grows unbounded during periods of activity, or (3) circular reference chains preventing garbage collection. The 10MB/10s growth rate and critical threshold breach suggest either a leaking heap or accumulation of long-lived objects in memory pools.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/memory_leak.py",
+      "retrieved_sources": [
+        "runbook:memory_leak.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service"
+      ],
+      "relevant_docs": [
+        "runbook:memory_leak.md"
+      ],
+      "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
+      "geval_score": 0.4
+    },
+    {
+      "id": "memory_leak_05",
+      "fault_kind_expected": "memory_leak",
+      "fault_kind_actual": "memory_leak",
+      "confidence": 0.75,
+      "root_cause_actual": "Transient garbage collection (GC) activity causing temporary RSS fluctuations, not a genuine memory leak",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/memory_leak.py",
+      "retrieved_sources": [
+        "runbook:memory_leak.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service"
+      ],
+      "relevant_docs": [
+        "runbook:memory_leak.md"
+      ],
+      "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM, though this short noisy window alone does not conclusively rule out transient GC activity.",
+      "geval_score": 0.2
+    },
+    {
+      "id": "db_deadlock_01",
+      "fault_kind_expected": "db_deadlock",
+      "fault_kind_actual": "db_deadlock",
+      "confidence": 0.85,
+      "root_cause_actual": "Lock contention in database transactions due to concurrent access patterns causing transaction timeouts and escalating wait times",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/db_deadlock.py",
+      "retrieved_sources": [
+        "runbook:db_deadlock.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:db_deadlock.md"
+      ],
+      "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
+      "geval_score": 0.5
+    },
+    {
+      "id": "db_deadlock_02",
+      "fault_kind_expected": "db_deadlock",
+      "fault_kind_actual": "db_deadlock",
+      "confidence": 0.85,
+      "root_cause_actual": "Escalating lock contention in database transactions without timeout or retry logic. Transactions 40 and 41 are experiencing increasing lock-wait times (1200ms and 1300ms respectively), indicating sustained deadlock conditions likely caused by circular dependency chains in transaction ordering or insufficient transaction isolation tuning.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/db_deadlock.py",
+      "retrieved_sources": [
+        "runbook:db_deadlock.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:db_deadlock.md"
+      ],
+      "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
+      "geval_score": 0.7
+    },
+    {
+      "id": "db_deadlock_03",
+      "fault_kind_expected": "db_deadlock",
+      "fault_kind_actual": "db_deadlock",
+      "confidence": 0.75,
+      "root_cause_actual": "Early-stage lock contention caused by increasing concurrent database transactions accessing shared resources in conflicting order, likely due to rising request volume or inefficient query locking patterns in mock_app",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/db_deadlock.py",
+      "retrieved_sources": [
+        "runbook:db_deadlock.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:db_deadlock.md"
+      ],
+      "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
+      "geval_score": 0.4
+    },
+    {
+      "id": "db_deadlock_04",
+      "fault_kind_expected": "db_deadlock",
+      "fault_kind_actual": "db_deadlock",
+      "confidence": 0.92,
+      "root_cause_actual": "Concurrent database transactions acquiring locks in inconsistent order, leading to circular lock dependencies. Transactions 88 and 89 show escalating lock contention (metrics 2200\u21922300), indicating resource exhaustion and deadlock formation in the database layer of mock_app.",
+      "mitigation_actual": "restart_service",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/db_deadlock.py",
+      "retrieved_sources": [
+        "runbook:db_deadlock.md"
+      ],
+      "acceptable_mitigations": [
+        "restart_service",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:db_deadlock.md"
+      ],
+      "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
+      "geval_score": 0.5
+    },
+    {
+      "id": "error_spike_01",
+      "fault_kind_expected": "error_spike",
+      "fault_kind_actual": "error_spike",
+      "confidence": 0.65,
+      "root_cause_actual": "Application service degradation causing widespread request failures on /work endpoint",
+      "mitigation_actual": "toggle_feature_flag",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/error_spike.py",
+      "retrieved_sources": [
+        "runbook:error_spike.md"
+      ],
+      "acceptable_mitigations": [
+        "toggle_feature_flag",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:error_spike.md"
+      ],
+      "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
+      "geval_score": 0.2
+    },
+    {
+      "id": "error_spike_02",
+      "fault_kind_expected": "error_spike",
+      "fault_kind_actual": "error_spike",
+      "confidence": 0.92,
+      "root_cause_actual": "Defective risky_feature flag implementation causing unhandled exceptions or application logic errors",
+      "mitigation_actual": "toggle_feature_flag",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/error_spike.py",
+      "retrieved_sources": [
+        "runbook:error_spike.md"
+      ],
+      "acceptable_mitigations": [
+        "toggle_feature_flag",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:error_spike.md"
+      ],
+      "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
+      "geval_score": 0.4
+    },
+    {
+      "id": "error_spike_03",
+      "fault_kind_expected": "error_spike",
+      "fault_kind_actual": "error_spike",
+      "confidence": 0.65,
+      "root_cause_actual": "Database deadlock or backend service degradation causing application errors",
+      "mitigation_actual": "toggle_feature_flag",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/error_spike.py",
+      "retrieved_sources": [
+        "runbook:error_spike.md"
+      ],
+      "acceptable_mitigations": [
+        "toggle_feature_flag",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:error_spike.md"
+      ],
+      "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
+      "geval_score": 0.1
+    },
+    {
+      "id": "error_spike_04",
+      "fault_kind_expected": "error_spike",
+      "fault_kind_actual": "error_spike",
+      "confidence": 0.65,
+      "root_cause_actual": "Application-level processing error or degraded backend dependency causing elevated 5xx response rate on mock_app",
+      "mitigation_actual": "toggle_feature_flag",
+      "durable_fix_actual": "patch_code",
+      "durable_fix_target_file": "mock_app/faults/error_spike.py",
+      "retrieved_sources": [
+        "runbook:error_spike.md"
+      ],
+      "acceptable_mitigations": [
+        "toggle_feature_flag",
+        "rollback"
+      ],
+      "relevant_docs": [
+        "runbook:error_spike.md"
+      ],
+      "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
+      "geval_score": 0.2
+    },
+    {
+      "id": "traffic_surge_01",
+      "fault_kind_expected": "traffic_surge",
+      "fault_kind_actual": "traffic_surge",
+      "confidence": 0.85,
+      "root_cause_actual": "Increased incoming request volume causing application to operate near capacity limits, resulting in elevated p95 latency (100-105ms). The application is responding to the load but showing early signs of latency degradation, suggesting that either request queuing has begun or resource utilization (CPU, memory, or I/O) is increasing under the elevated traffic volume.",
+      "mitigation_actual": "scale_out",
+      "durable_fix_actual": null,
+      "durable_fix_target_file": null,
+      "retrieved_sources": [
+        "runbook:traffic_surge.md"
+      ],
+      "acceptable_mitigations": [
+        "scale_out"
+      ],
+      "relevant_docs": [
+        "runbook:traffic_surge.md"
+      ],
+      "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
+      "geval_score": 0.5
+    },
+    {
+      "id": "traffic_surge_02",
+      "fault_kind_expected": "traffic_surge",
+      "fault_kind_actual": "traffic_surge",
+      "confidence": 0.75,
+      "root_cause_actual": "Increased request volume exceeding application capacity, causing queueing and latency degradation under sustained load",
+      "mitigation_actual": "scale_out",
+      "durable_fix_actual": null,
+      "durable_fix_target_file": null,
+      "retrieved_sources": [
+        "runbook:traffic_surge.md"
+      ],
+      "acceptable_mitigations": [
+        "scale_out"
+      ],
+      "relevant_docs": [
+        "runbook:traffic_surge.md"
+      ],
+      "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
+      "geval_score": 0.3
+    },
+    {
+      "id": "traffic_surge_03",
+      "fault_kind_expected": "traffic_surge",
+      "fault_kind_actual": "traffic_surge",
+      "confidence": 0.85,
+      "root_cause_actual": "Undersized worker pool unable to handle current request load, causing queuing and elevated latency",
+      "mitigation_actual": "scale_out",
+      "durable_fix_actual": null,
+      "durable_fix_target_file": null,
+      "retrieved_sources": [
+        "runbook:traffic_surge.md"
+      ],
+      "acceptable_mitigations": [
+        "scale_out"
+      ],
+      "relevant_docs": [
+        "runbook:traffic_surge.md"
+      ],
+      "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
+      "geval_score": 0.7
+    },
+    {
+      "id": "traffic_surge_04",
+      "fault_kind_expected": "traffic_surge",
+      "fault_kind_actual": "traffic_surge",
+      "confidence": 0.85,
+      "root_cause_actual": "Increased incoming traffic load causing elevated p95 latency approaching degradation threshold on mock_app",
+      "mitigation_actual": "scale_out",
+      "durable_fix_actual": null,
+      "durable_fix_target_file": null,
+      "retrieved_sources": [
+        "runbook:traffic_surge.md"
+      ],
+      "acceptable_mitigations": [
+        "scale_out"
+      ],
+      "relevant_docs": [
+        "runbook:traffic_surge.md"
+      ],
+      "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
+      "geval_score": 0.2
+    },
+    {
+      "id": "traffic_surge_05",
+      "fault_kind_expected": "traffic_surge",
+      "fault_kind_actual": "traffic_surge",
+      "confidence": 0.85,
+      "root_cause_actual": "Increased incoming request volume overwhelming application capacity, resulting in request queuing and sustained elevated p95 latency (260-265ms vs baseline). The 22 suppressed duplicate events over the 30-second window indicate persistent load conditions rather than transient spike.",
+      "mitigation_actual": "scale_out",
+      "durable_fix_actual": null,
+      "durable_fix_target_file": null,
+      "retrieved_sources": [
+        "runbook:traffic_surge.md"
+      ],
+      "acceptable_mitigations": [
+        "scale_out"
+      ],
+      "relevant_docs": [
+        "runbook:traffic_surge.md"
+      ],
+      "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
+      "geval_score": 0.6
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "incident_id": "db_deadlock_03",
+  "fault_kind": "db_deadlock",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Early-stage lock contention on mock_app",
+  "summary": "Lock waits have just begun climbing; still low magnitude but trending upward.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 1,
+  "sample_events": [
+    {
+      "event_id": "db_deadlock-19",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 3",
+      "metric": 500.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:19"
+    },
+    {
+      "event_id": "db_deadlock-20",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 4",
+      "metric": 600.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:20"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

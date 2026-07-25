@@ -1,0 +1,35 @@
+{
+  "incident_id": "error_spike_03",
+  "fault_kind": "error_spike",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "5xx rate severely elevated on mock_app",
+  "summary": "Error rate has climbed above 60% and is not self-recovering.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 14,
+  "sample_events": [
+    {
+      "event_id": "error_spike-27",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 60%",
+      "metric": 60.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:27"
+    },
+    {
+      "event_id": "error_spike-28",
+      "fault_kind": "error_spike",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "5xx rate 65%",
+      "metric": 65.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "error_spike:28"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

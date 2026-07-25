@@ -1,0 +1,35 @@
+{
+  "incident_id": "db_deadlock_02",
+  "fault_kind": "db_deadlock",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Escalating lock waits on mock_app",
+  "summary": "Lock-wait time continues to climb with no timeout or retry logic in place.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 18,
+  "sample_events": [
+    {
+      "event_id": "db_deadlock-17",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 40",
+      "metric": 1200.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:17"
+    },
+    {
+      "event_id": "db_deadlock-18",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 41",
+      "metric": 1300.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:18"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

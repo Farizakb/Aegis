@@ -7,33 +7,38 @@
   genuinely returns HTTP 500 for roughly half of all requests.
 
 ## Root cause
-`ErrorSpikeFault` (`mock_app/faults/error_spike.py`) exposes `should_fail()`, called from the
-`/work` endpoint. While the fault is active, each call increments `self._total` and, with
-probability `ERROR_RATE = 0.5`, also increments `self._errors` and returns `True` (causing
-`/work` to respond with a 500). `emit_signals` periodically reports the running error rate
-(`self._errors / self._total * 100`). This models a downstream dependency that has become
-unreliable — e.g. a flaky upstream service or a bad deploy — with no protection on the calling
-side.
+This fault is **flag-tied**. `ErrorSpikeFault` (`mock_app/faults/error_spike.py`) 500s on `/work`
+**only while the `risky_feature` feature flag is on**. `trigger()` turns the flag on; `should_fail()`
+short-circuits to `False` the moment the flag is off, so the 500s are gated entirely by the flag,
+not by any in-process state. The flag ships as part of a deploy: `trigger()` no-ops when
+`app_version() == "previous"`, i.e. the risky feature was introduced by the **most recent deploy**.
 
 Key constants:
-- `ERROR_RATE = 0.5` — fraction of `/work` calls that fail while active.
+- `RISKY_FLAG = "risky_feature"` — the flag that gates the failing code path.
+- `ERROR_RATE = 0.5` — fraction of `/work` calls that fail *while the flag is on*.
 - `BUCKET_SIZE_PCT = 10` — dedup bucket granularity for the emitted error-rate metric.
 
 ## Diagnosis steps
 1. Confirm `incident.fault_kind == "error_spike"` and `severity == "error"`.
 2. Read `sample_events[].metric` — error rate should be roughly stable around 40-60%.
-3. Inspect `mock_app/main.py`'s `/work` handler and `ErrorSpikeFault.should_fail()` — every
-   request is sent straight through with no retry, fallback, or circuit breaker.
+3. Check `GET /flags` — `risky_feature` will be `true`. This is the decisive signal: the 5xx are
+   tied to that flag, even when the incident text does not mention it by name.
 
-## Recommended fix
-Add resilience to the `/work` call path rather than (or in addition to) fixing the upstream
-dependency:
-- Circuit breaker: once the error rate over a rolling window exceeds a threshold, short-circuit
-  `/work` to a fast fallback response instead of calling through, and periodically probe to
-  see if the dependency has recovered.
-- Retry with backoff for transient failures, bounded so retries don't amplify load on an
-  already-struggling dependency.
+## Mitigation (do this NOW)
+Prefer the cheapest reversible action that clears the fault immediately:
+- **`toggle_feature_flag` (flag_name=`risky_feature`)** — the kill switch. Turning the flag off stops
+  the 500s instantly, because `should_fail()` returns `False` whenever the flag is disabled. This is
+  the primary mitigation.
+- **`rollback`** — also valid: the risky feature shipped in the last deploy, so reverting to the
+  previous version removes the flagged code path. Slightly heavier than the flag toggle but clears
+  the same fault.
 
-The patch should target `mock_app/main.py` (the `/work` handler) and/or
-`mock_app/faults/error_spike.py` (`should_fail`), depending on whether the fix is framed as
-"protect the caller" or "stabilize the simulated dependency".
+Do **not** `restart_service`: the failure is gated by the flag, not by in-process state, so a restart
+leaves `risky_feature` on and the 5xx continue. Restart is the wrong reflex for a flag-tied spike.
+
+## Durable fix (file as follow-up, do not apply now)
+Once mitigated, draft a `patch_code` durable fix so the feature can be safely re-enabled: correct the
+faulty code path behind `risky_feature` (in `mock_app/faults/error_spike.py` `should_fail`, and/or the
+`/work` handler in `mock_app/main.py`) so it no longer 500s, and/or add resilience (circuit breaker /
+bounded retry with backoff) on the calling side. The durable fix is never the on-call mitigation —
+toggle the flag first, patch later.

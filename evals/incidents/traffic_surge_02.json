@@ -1,0 +1,35 @@
+{
+  "incident_id": "traffic_surge_02",
+  "fault_kind": "traffic_surge",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Latency degraded past threshold on mock_app",
+  "summary": "p95 latency has crossed the degraded threshold under sustained synthetic load.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 8,
+  "sample_events": [
+    {
+      "event_id": "traffic_surge-33",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 180ms under load",
+      "metric": 180.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:33"
+    },
+    {
+      "event_id": "traffic_surge-34",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 185ms under load",
+      "metric": 185.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:34"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

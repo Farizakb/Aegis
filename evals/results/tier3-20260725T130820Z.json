@@ -1,0 +1,63 @@
+{
+  "tier": 3,
+  "run_at": "20260725T130820Z",
+  "code_git_sha": "1492ae3",
+  "n_cases": 4,
+  "model_config": {
+    "triage": "claude-haiku-4-5-20251001",
+    "propose": "claude-sonnet-4-6"
+  },
+  "metrics": {
+    "remediation_success_rate": 1.0
+  },
+  "results": [
+    {
+      "id": "memory_leak_01",
+      "mitigation_actual": "restart_service",
+      "fault_kind": "memory_leak",
+      "sandbox_passed": true,
+      "before_metrics": {
+        "rss_mb": 175.0
+      },
+      "after_metrics": {
+        "rss_mb": 0.0
+      }
+    },
+    {
+      "id": "db_deadlock_01",
+      "mitigation_actual": "restart_service",
+      "fault_kind": "db_deadlock",
+      "sandbox_passed": true,
+      "before_metrics": {
+        "lock_wait_ms": 4000.0
+      },
+      "after_metrics": {
+        "lock_wait_ms": 0.0
+      }
+    },
+    {
+      "id": "error_spike_01",
+      "mitigation_actual": "toggle_feature_flag",
+      "fault_kind": "error_spike",
+      "sandbox_passed": true,
+      "before_metrics": {
+        "error_rate_pct": 45.0
+      },
+      "after_metrics": {
+        "error_rate_pct": 11.25
+      }
+    },
+    {
+      "id": "traffic_surge_01",
+      "mitigation_actual": "scale_out",
+      "fault_kind": "traffic_surge",
+      "sandbox_passed": true,
+      "before_metrics": {
+        "latency_ms": 200.0
+      },
+      "after_metrics": {
+        "latency_ms": 25.0
+      }
+    }
+  ]
+}

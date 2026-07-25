@@ -1,0 +1,35 @@
+{
+  "incident_id": "db_deadlock_04",
+  "fault_kind": "db_deadlock",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Severe, long-running lock contention on mock_app",
+  "summary": "Lock-wait time has been climbing for an extended window and queries are now failing outright.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 30,
+  "sample_events": [
+    {
+      "event_id": "db_deadlock-21",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 88",
+      "metric": 2200.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:21"
+    },
+    {
+      "event_id": "db_deadlock-22",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 89",
+      "metric": 2300.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:22"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

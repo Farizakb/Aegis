@@ -29,6 +29,9 @@ dev = [
     "fakeredis[lua]>=2.21",
     "pyyaml>=6.0",
 ]
+eval = [
+    "deepeval>=1.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

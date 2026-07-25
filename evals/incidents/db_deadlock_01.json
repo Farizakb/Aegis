@@ -1,0 +1,35 @@
+{
+  "incident_id": "db_deadlock_01",
+  "fault_kind": "db_deadlock",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Lock contention rising on mock_app",
+  "summary": "Transactions are timing out waiting on locks; wait time is growing every other tick.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 4,
+  "sample_events": [
+    {
+      "event_id": "db_deadlock-15",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 14",
+      "metric": 600.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:15"
+    },
+    {
+      "event_id": "db_deadlock-16",
+      "fault_kind": "db_deadlock",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "deadlock detected on txn 15",
+      "metric": 700.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "db_deadlock:16"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

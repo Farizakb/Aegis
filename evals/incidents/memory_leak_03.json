@@ -1,0 +1,45 @@
+{
+  "incident_id": "memory_leak_03",
+  "fault_kind": "memory_leak",
+  "severity": "critical",
+  "source": "mock_app",
+  "title": "Sustained RSS growth nearing OOM on mock_app",
+  "summary": "RSS has grown continuously for an extended window and is now well past the critical threshold.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 3,
+  "duplicate_count": 20,
+  "sample_events": [
+    {
+      "event_id": "memory_leak-7",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=905 and rising",
+      "metric": 905.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:7"
+    },
+    {
+      "event_id": "memory_leak-8",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=910 and rising",
+      "metric": 910.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:8"
+    },
+    {
+      "event_id": "memory_leak-9",
+      "fault_kind": "memory_leak",
+      "severity": "critical",
+      "source": "mock_app",
+      "message": "rss_mb=915 and rising",
+      "metric": 915.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "memory_leak:9"
+    }
+  ],
+  "correlation_window_s": 30.0
+}

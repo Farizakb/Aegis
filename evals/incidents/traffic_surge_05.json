@@ -1,0 +1,35 @@
+{
+  "incident_id": "traffic_surge_05",
+  "fault_kind": "traffic_surge",
+  "severity": "error",
+  "source": "mock_app",
+  "title": "Sustained severe latency surge on mock_app",
+  "summary": "p95 latency has remained far above baseline across an extended window.",
+  "first_seen": "2026-07-23T12:00:00Z",
+  "last_seen": "2026-07-23T12:00:00Z",
+  "event_count": 2,
+  "duplicate_count": 22,
+  "sample_events": [
+    {
+      "event_id": "traffic_surge-39",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 260ms under load",
+      "metric": 260.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:39"
+    },
+    {
+      "event_id": "traffic_surge-40",
+      "fault_kind": "traffic_surge",
+      "severity": "error",
+      "source": "mock_app",
+      "message": "p95 latency 265ms under load",
+      "metric": 265.0,
+      "ts": "2026-07-23T12:00:00Z",
+      "dedup_key": "traffic_surge:40"
+    }
+  ],
+  "correlation_window_s": 30.0
+}
