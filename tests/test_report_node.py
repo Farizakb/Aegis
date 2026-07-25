@@ -112,7 +112,9 @@ async def test_blocked_outcome():
     assert report.outcome is Outcome.blocked
 
 
-async def test_durable_fix_filed_only_when_applied():
+async def test_durable_fix_filed_on_every_terminal_outcome():
+    # §5: the durable fix lands in the "open durable fixes" queue regardless of
+    # whether the mitigation was applied, rejected, or blocked.
     registry = FakeRegistry()
     state = _state(applied=True, durable_fix=_patch_action())
     await report_node(state, sink=FakeSink(), registry=registry)
@@ -120,6 +122,18 @@ async def test_durable_fix_filed_only_when_applied():
 
     registry = FakeRegistry()
     state = _state(applied=False, hitl=HitlChoice.reject, durable_fix=_patch_action())
+    await report_node(state, sink=FakeSink(), registry=registry)
+    assert len(registry.filed) == 1
+
+    registry = FakeRegistry()
+    state = _state(applied=False, policy=PolicyDecision.block, durable_fix=_patch_action())
+    await report_node(state, sink=FakeSink(), registry=registry)
+    assert len(registry.filed) == 1
+
+
+async def test_no_durable_fix_files_nothing():
+    registry = FakeRegistry()
+    state = _state(applied=True, durable_fix=None)
     await report_node(state, sink=FakeSink(), registry=registry)
     assert registry.filed == []
 

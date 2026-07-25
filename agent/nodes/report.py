@@ -36,7 +36,9 @@ async def report_node(state: AgentState, sink, registry) -> dict:
     durable_fix = plan.durable_fix if plan else None
 
     outcome = _determine_outcome(state)
-    if durable_fix is not None and outcome is Outcome.applied:
+    # File the durable fix regardless of terminal outcome (§5 "open durable fixes"):
+    # a rejected/blocked/escalated incident still has an unfixed root cause worth ticketing.
+    if durable_fix is not None:
         registry.file(incident=incident, triage=triage, fix=durable_fix)
 
     applied_target_file = (
