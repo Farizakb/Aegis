@@ -14,7 +14,7 @@
     "retrieval_precision_at_1": 1.0,
     "mean_confidence": 0.8022222222222222,
     "pct_below_confidence_floor": 0.16666666666666666,
-    "geval_mean": null,
+    "geval_mean": 0.4,
     "durable_fix_valid_path_rate": 1.0
   },
   "results": [
@@ -37,7 +37,7 @@
         "runbook:memory_leak.md"
       ],
       "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
-      "geval_score": null
+      "geval_score": 0.7
     },
     {
       "id": "memory_leak_02",
@@ -58,7 +58,7 @@
         "runbook:memory_leak.md"
       ],
       "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
-      "geval_score": null
+      "geval_score": 0.3
     },
     {
       "id": "memory_leak_03",
@@ -79,7 +79,7 @@
         "runbook:memory_leak.md"
       ],
       "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
-      "geval_score": null
+      "geval_score": 0.3
     },
     {
       "id": "memory_leak_04",
@@ -100,7 +100,7 @@
         "runbook:memory_leak.md"
       ],
       "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM.",
-      "geval_score": null
+      "geval_score": 0.4
     },
     {
       "id": "memory_leak_05",
@@ -121,7 +121,7 @@
         "runbook:memory_leak.md"
       ],
       "root_cause_reference": "Unbounded in-process buffer growth per request tick raises RSS until OOM, though this short noisy window alone does not conclusively rule out transient GC activity.",
-      "geval_score": null
+      "geval_score": 0.2
     },
     {
       "id": "db_deadlock_01",
@@ -143,7 +143,7 @@
         "runbook:db_deadlock.md"
       ],
       "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
-      "geval_score": null
+      "geval_score": 0.5
     },
     {
       "id": "db_deadlock_02",
@@ -165,7 +165,7 @@
         "runbook:db_deadlock.md"
       ],
       "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
-      "geval_score": null
+      "geval_score": 0.7
     },
     {
       "id": "db_deadlock_03",
@@ -187,7 +187,7 @@
         "runbook:db_deadlock.md"
       ],
       "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
-      "geval_score": null
+      "geval_score": 0.4
     },
     {
       "id": "db_deadlock_04",
@@ -209,7 +209,7 @@
         "runbook:db_deadlock.md"
       ],
       "root_cause_reference": "Growing, unbounded lock-wait time models two transactions perpetually waiting on each other's locks with no timeout or retry.",
-      "geval_score": null
+      "geval_score": 0.5
     },
     {
       "id": "error_spike_01",
@@ -231,7 +231,7 @@
         "runbook:error_spike.md"
       ],
       "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
-      "geval_score": null
+      "geval_score": 0.2
     },
     {
       "id": "error_spike_02",
@@ -253,7 +253,7 @@
         "runbook:error_spike.md"
       ],
       "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
-      "geval_score": null
+      "geval_score": 0.4
     },
     {
       "id": "error_spike_03",
@@ -275,7 +275,7 @@
         "runbook:error_spike.md"
       ],
       "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
-      "geval_score": null
+      "geval_score": 0.1
     },
     {
       "id": "error_spike_04",
@@ -297,7 +297,7 @@
         "runbook:error_spike.md"
       ],
       "root_cause_reference": "The risky_feature flag, enabled by the most recent deploy, gates a code path that returns HTTP 500 on /work for roughly half of requests; the 5xx are tied entirely to the flag, not to in-process state.",
-      "geval_score": null
+      "geval_score": 0.2
     },
     {
       "id": "traffic_surge_01",
@@ -318,7 +318,7 @@
         "runbook:traffic_surge.md"
       ],
       "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
-      "geval_score": null
+      "geval_score": 0.5
     },
     {
       "id": "traffic_surge_02",
@@ -339,7 +339,7 @@
         "runbook:traffic_surge.md"
       ],
       "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
-      "geval_score": null
+      "geval_score": 0.3
     },
     {
       "id": "traffic_surge_03",
@@ -360,7 +360,7 @@
         "runbook:traffic_surge.md"
       ],
       "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
-      "geval_score": null
+      "geval_score": 0.7
     },
     {
       "id": "traffic_surge_04",
@@ -381,7 +381,7 @@
         "runbook:traffic_surge.md"
       ],
       "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
-      "geval_score": null
+      "geval_score": 0.2
     },
     {
       "id": "traffic_surge_05",
@@ -402,7 +402,7 @@
         "runbook:traffic_surge.md"
       ],
       "root_cause_reference": "Latency is a deterministic function of synthetic load divided by worker count, so capacity is undersized for current demand, not a code defect.",
-      "geval_score": null
+      "geval_score": 0.6
     }
   ]
 }

@@ -2,6 +2,7 @@ import argparse
 import json
 
 from evals.run_evals import (
+    _apply_geval,
     _missing_runbooks,
     _representative_cases,
     _run_tier2_cli,
@@ -68,6 +69,34 @@ def test_representative_cases_one_per_fault_kind():
     assert len(reps) == 4
     kinds = {c.incident.fault_kind.value for c in reps}
     assert kinds == {"memory_leak", "db_deadlock", "error_spike", "traffic_surge"}
+
+
+def test_apply_geval_scores_in_main_thread(monkeypatch):
+    """G-Eval is applied by _apply_geval (main thread, post-async), not inside
+    run_tier2's asyncio loop — the deepeval-4.x-in-asyncio deadlock fix. Uses a
+    stubbed judge so the test stays offline and deterministic."""
+    import evals.geval as geval_module
+
+    monkeypatch.setattr(geval_module, "score_root_cause", lambda actual, ref: 0.6)
+
+    class _Case:
+        truth = {"root_cause_reference": "ref"}
+
+    results = [{"root_cause_actual": "a"}, {"root_cause_actual": "b"}]
+    _apply_geval(results, [_Case(), _Case()])
+    assert [r["geval_score"] for r in results] == [0.6, 0.6]
+
+
+def test_run_tier2_does_not_score_geval_inline():
+    """Regression guard: run_tier2 must NOT invoke the judge (score_root_cause)
+    in its async loop — that path deadlocks DeepEval 4.x. Scoring belongs to the
+    main-thread _apply_geval pass."""
+    import inspect
+
+    from evals.run_evals import run_tier2
+
+    src = inspect.getsource(run_tier2)
+    assert "score_root_cause" not in src
 
 
 def test_tier2_cli_runtime_error_is_report_only(monkeypatch, tmp_path, capsys):

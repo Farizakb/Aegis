@@ -122,11 +122,15 @@ def _write_result(out_dir: Path, tier: int, results: list[dict], metrics: dict,
 
 
 async def run_tier2(cases: list, *, triage_llm, propose_llm, search_tool) -> list[dict]:
-    """Replay each case through triage->retrieve->propose, then score with a
-    DETERMINISTIC retrieval query (locked decision Q6) so P@k/recall@k are
-    reproducible and independent of noisy triage output."""
+    """Replay each case through triage->retrieve->propose, then override the
+    retrieved sources with a DETERMINISTIC retrieval query (locked decision Q6)
+    so P@k/recall@k are reproducible and independent of noisy triage output.
+
+    G-Eval is deliberately NOT scored here: DeepEval 4.x's internal event-loop
+    handling deadlocks when the judge is driven from inside this running asyncio
+    loop (even via asyncio.to_thread) — proven at the Phase-6 live checkpoint.
+    `_apply_geval` runs the judge in the main thread AFTER `asyncio.run` returns."""
     from evals.drivers import run_propose
-    from evals.geval import score_root_cause
 
     results = []
     for case in cases:
@@ -140,13 +144,22 @@ async def run_tier2(cases: list, *, triage_llm, propose_llm, search_tool) -> lis
             if c["source"] not in seen:
                 seen.append(c["source"])
         result["retrieved_sources"] = seen
-        # Run the (sync, DeepEval-internal-event-loop) judge in a worker thread so it
-        # gets its own fresh event loop instead of nesting inside this async run.
-        result["geval_score"] = await asyncio.to_thread(
-            score_root_cause, result["root_cause_actual"], case.truth["root_cause_reference"]
-        )
         results.append(result)
     return results
+
+
+def _apply_geval(results: list[dict], cases: list) -> None:
+    """Score G-Eval root-cause quality in the MAIN thread, AFTER the async graph
+    replay finishes. DeepEval 4.x deadlocks when its judge is invoked from inside
+    a running asyncio.run() loop (even via asyncio.to_thread) — verified at the
+    Phase-6 live checkpoint — so it must run with no event loop active. Mutates
+    each result in place; score_root_cause returns None when the judge is skipped."""
+    from evals.geval import score_root_cause
+
+    for result, case in zip(results, cases):
+        result["geval_score"] = score_root_cause(
+            result["root_cause_actual"], case.truth["root_cause_reference"]
+        )
 
 
 def _tier2_metrics(results: list[dict]) -> dict:
@@ -271,6 +284,7 @@ def _run_tier2_cli(args) -> None:
         cases = load_tier2_cases()
         results = asyncio.run(run_tier2(cases, triage_llm=triage_llm, propose_llm=propose_llm,
                                          search_tool=search_tool))
+        _apply_geval(results, cases)  # main thread: DeepEval deadlocks inside the async loop
         metrics = _tier2_metrics(results)
         model_config = {"triage": triage_llm.model, "propose": propose_llm.model}
         path = _write_result(Path(args.out_dir), 2, results, metrics, model_config)
