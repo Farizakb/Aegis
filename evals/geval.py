@@ -4,12 +4,14 @@ DeepEval defaults its judge to GPT-4 via OPENAI_API_KEY; we override with a
 DeepEvalBaseLLM wrapping our Haiku tier so the system stays Anthropic-only.
 Graceful skip (returns None) without deepeval installed or ANTHROPIC_API_KEY.
 """
-# NOTE: the exact DeepEval API surface below (GEval constructor kwargs,
-# DeepEvalBaseLLM.generate/a_generate call signature, metric.measure(tc))
-# is inferred from docs/source and has NOT been exercised against a real
-# `deepeval` install + live ANTHROPIC_API_KEY yet. Verify it end-to-end
-# with `pip install '.[eval]'` at the Phase-6 live checkpoint and adjust
-# if the installed version's signature differs.
+# NOTE: verified end-to-end against deepeval 4.1.3 + a live ANTHROPIC_API_KEY at
+# the Phase-6 checkpoint — GEval(name/model/evaluation_params/evaluation_steps),
+# DeepEvalBaseLLM.generate/a_generate, and metric.measure(tc) all work as written
+# (a near-perfect answer scores ~0.7; this judge tops out around 0.7). Caveat:
+# `LLMTestCaseParams` is deprecated (-> `SingleTurnParams`) but still functional —
+# left as-is to keep the `deepeval>=1.0` floor. The judge must NOT be driven from
+# inside a running asyncio loop (DeepEval's nest_asyncio internal loop deadlocks);
+# callers score it in the main thread — see evals/run_evals.py `_apply_geval`.
 from __future__ import annotations
 
 import os
