@@ -8,6 +8,8 @@
 .crewai/
 .llama_index/
 .phoenix/
+.deepeval/
+.deepeval-cache.json
 langchain.log
 agent_run.log
 
