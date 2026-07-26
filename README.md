@@ -39,7 +39,7 @@ each with declared safety metadata (blast radius, reversibility) that the policy
 
 ```mermaid
 flowchart TD
-    A[Fault injected in mock_app] --> B[aegis:events Redis stream]
+    A["Fault injected in mock_app"] --> B["aegis:events Redis stream"]
     B --> C["consumer.correlate<br/>dedupe + correlate to one IncidentEvent<br/>(the trace starts here)"]
     C --> D["aegis:incidents<br/>+ W3C traceparent field"]
     D --> E["Triage<br/>fault class + root-cause hypothesis + confidence"]
@@ -48,8 +48,8 @@ flowchart TD
     G --> H{"Sandbox fault replay<br/>does the action actually clear it?"}
     H -- "fail: re-propose with evidence, may switch action (max 2 retries)" --> G
     H -- pass --> I{"Policy gate<br/>7 deterministic rules, deny by default"}
-    I -- block --> M[Report]
-    I -- allow --> L[Apply]
+    I -- block --> M["Report"]
+    I -- allow --> L["Apply"]
     I -- needs approval --> J{"HITL evidence brief<br/>+ TTL"}
     J -- "reject / expire" --> M
     J -- approve --> L
