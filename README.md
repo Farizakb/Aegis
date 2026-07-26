@@ -1,9 +1,5 @@
 # Aegis — Self-Healing Incident-Response Agent
 
-> ⚠️ **Work in progress.** Core pipeline plus end-to-end observability are built and run
-> (Phases 1–5); the eval pyramid and dashboard are next (Phases 6–7). This README is a
-> placeholder and will be expanded when the project is complete.
-
 Aegis is an agentic system that consumes incidents off a live event stream, decides on a
 remediation, **proves the action actually clears the fault by replaying it in an isolated
 sandbox**, gates it through a deterministic deny-by-default policy engine, asks a human for
@@ -37,6 +33,104 @@ filed as a follow-up and can be **promoted to its own pipeline run** with one cl
 `restart_service`, `rollback`, `toggle_feature_flag`, `scale_out`, `patch_code`, `escalate` —
 each with declared safety metadata (blast radius, reversibility) that the policy engine consumes.
 
+## Architecture
+
+### Incident lifecycle
+
+```mermaid
+flowchart TD
+    A[Fault injected in mock_app] --> B[aegis:events Redis stream]
+    B --> C["consumer.correlate<br/>dedupe + correlate to one IncidentEvent<br/>(the trace starts here)"]
+    C --> D["aegis:incidents<br/>+ W3C traceparent field"]
+    D --> E["Triage<br/>fault class + root-cause hypothesis + confidence"]
+    E --> F["Retrieve<br/>runbooks + git history (PGVector RAG via MCP)"]
+    F --> G["Propose<br/>RemediationPlan: mitigation now + durable fix later"]
+    G --> H{"Sandbox fault replay<br/>does the action actually clear it?"}
+    H -- "fail: re-propose with evidence, may switch action (max 2 retries)" --> G
+    H -- pass --> I{"Policy gate<br/>7 deterministic rules, deny by default"}
+    I -- block --> M[Report]
+    I -- allow --> L[Apply]
+    I -- needs approval --> J{"HITL evidence brief<br/>+ TTL"}
+    J -- "reject / expire" --> M
+    J -- approve --> L
+    L --> M
+    M --> N[("Postgres incident_reports")]
+    M --> O["Open durable fix<br/>promotable to its own run"]
+```
+
+### Service topology
+
+```mermaid
+flowchart LR
+    subgraph host["Host (zero-config)"]
+        AG["agent<br/>LangGraph graph + HITL UI :8001"]
+        DSH["dashboard<br/>Streamlit :8501"]
+    end
+    subgraph compose["Docker Compose"]
+        APP["mock_app :8000<br/>4 injectable faults"]
+        RD[("Redis Streams")]
+        PG[("Postgres + pgvector")]
+        JG["Jaeger :16686"]
+        SB["disposable sandbox<br/>containers"]
+    end
+    APP -->|events| RD
+    RD -->|"incidents + traceparent"| AG
+    AG -->|"RAG over runbooks + commits"| PG
+    AG -->|"fault replay + before/after proof"| SB
+    AG -->|"restart / rollback / flag / scale / patch"| APP
+    AG -->|IncidentReport| PG
+    AG -->|"OTLP spans"| JG
+    PG --> DSH
+```
+
+## Measured results
+
+Every number below is produced by `evals/run_evals.py`, written to a timestamped JSON in
+`evals/results/`, committed, and rendered on the dashboard's Evaluation tab.
+
+| Metric | Result | Tier |
+|---|---|---|
+| Unsafe actions blocked | 100% | 1 — runs in CI on every commit |
+| Triage accuracy | 100% | 2 |
+| Action-selection accuracy | 100% | 2 |
+| Retrieval recall@3 / precision@1 | 100% / 100% | 2 |
+| Remediation success (fault empirically cleared in sandbox) | 100% | 3 |
+| End-to-end outcome accuracy | 100% | 4 |
+| Root-cause reasoning quality (G-Eval rubric) | 0.40 / 1.00 | 2 |
+| Cost reduction from model tiering | −31% (Haiku triage) / −74% (all-Haiku) | experiment |
+
+### How to read these numbers
+
+**Triage accuracy is the easy part.** The fault kind is present in the triage prompt, so
+classification is close to trivial — 100% here is table stakes, not the achievement. The
+interesting question is whether the agent's *root-cause reasoning* holds up, which is
+exactly why a fuzzy judge scores it separately.
+
+**G-Eval 0.40 is a moderate score, not "60% wrong".** G-Eval rubrics rarely award above
+0.7 even for strong answers, so this judge's practical ceiling is around 0.7. The real
+finding is structural: triage runs *before* retrieval, so it cannot know code-level
+mechanisms (for `error_spike`, that the 5xx are tied to a feature flag) from a sparse
+alert. The fuzzy metric exposes a quality ceiling that the deterministic 100%s cannot see.
+
+**Model tiering: cost is the deterministic claim.** Cost is computed from token counts
+against a static pricing table, so it reproduces exactly. Single-run accuracy deltas over
+18 cases are sampling noise — an earlier two-config run showed a 6% action-selection drop
+that vanished on re-run, which is why per-case results are stored in the artifact.
+Action-selection accuracy is also coarse set membership: it does not measure patch-draft
+or root-cause quality, so the sweep supports "Haiku for triage is free" without claiming
+all-Haiku matches all-Sonnet on finer quality. That is why the strong model stays on the
+propose node.
+
+**Traces root at correlation, not at fault injection.** Correlation fans many raw events
+into one incident, so there is no single upstream emit to root a per-incident trace at.
+The Jaeger waterfall therefore spans *correlation → applied fix*, carrying `traceparent`
+across the Redis boundary into the agent process.
+
+Five headline metrics plus the G-Eval rubric are the load-bearing claims. Three further
+diagnostics (`mean_confidence`, `pct_below_confidence_floor`, `durable_fix_valid_path_rate`)
+are recorded to interpret behaviour, not as headline results. Metrics for tiers 2–4 are
+computed over live, non-deterministic LLM runs, so small run-to-run variation is expected.
+
 ## Tech stack
 
 | Layer | Choice |
@@ -61,8 +155,8 @@ each with declared safety metadata (blast radius, reversibility) that the policy
 | 3 | Policy engine + tier-1 evals in CI | ✅ Done |
 | 4 | Agent nodes, reflective retry, live appliers, HITL, reports | ✅ Done |
 | 5 | Observability (OpenTelemetry + Jaeger + structlog + LangSmith) | ✅ Done |
-| 6 | Eval pyramid + model-tiering experiment | ⏳ Planned |
-| 7 | Streamlit dashboard + writeup | ⏳ Planned |
+| 6 | Eval pyramid + model-tiering experiment | ✅ Done |
+| 7 | Streamlit dashboard + writeup | ✅ Done |
 
 ## Running it
 
@@ -98,16 +192,29 @@ The **Jaeger UI** (one trace-waterfall per incident) serves at http://localhost:
 > - LangSmith LLM tracing is optional and off by default; set `LANGCHAIN_TRACING_V2=true` **and**
 >   a `LANGCHAIN_API_KEY` to enable it (enabling the flag without a key produces 401 noise).
 
+### Dashboard
+
+```bash
+pip install -e ".[dashboard]"
+streamlit run dashboard/app.py     # http://localhost:8501
+```
+
+Two tabs, two data sources: **Operations** reads the `incident_reports` table (outcomes,
+attempted-action trails, open durable fixes, expired approvals, per-incident cost and
+per-node p50/p95 latency); **Evaluation** reads `evals/results/*.json` (headline metrics,
+run-over-run trend, model-tiering comparison). It is a read-only viewer and runs on the
+host like the agent — no extra container.
+
 ## Tests
 
 ```bash
-# Fast suite (no Docker)
+# Fast suite (needs Postgres running; two integration tests hit the database)
 python -m pytest tests/ -m "not docker" -q
 
-# Integration suite (needs Docker)
+# Integration suite (needs Docker; takes roughly 20 minutes)
 python -m pytest tests/ -m docker -q
 ```
 
 ---
 
-*Portfolio project by Fariz Akbarzada. Detailed writeup, architecture diagram, and demo to follow.*
+*Portfolio project by Fariz Akbarzada.*
