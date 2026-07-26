@@ -8,8 +8,9 @@ Graceful skip (returns None) without deepeval installed or ANTHROPIC_API_KEY.
 # the Phase-6 checkpoint — GEval(name/model/evaluation_params/evaluation_steps),
 # DeepEvalBaseLLM.generate/a_generate, and metric.measure(tc) all work as written
 # (a near-perfect answer scores ~0.7; this judge tops out around 0.7). Caveat:
-# `LLMTestCaseParams` is deprecated (-> `SingleTurnParams`) but still functional —
-# left as-is to keep the `deepeval>=1.0` floor. The judge must NOT be driven from
+# `LLMTestCaseParams` was renamed to `SingleTurnParams` in deepeval >= 4.1; we
+# prefer the new name and fall back to the old one so the `deepeval>=1.0` floor
+# keeps working either way. The judge must NOT be driven from
 # inside a running asyncio loop (DeepEval's nest_asyncio internal loop deadlocks);
 # callers score it in the main thread — see evals/run_evals.py `_apply_geval`.
 from __future__ import annotations
@@ -32,8 +33,13 @@ def score_root_cause(actual_reasoning: str, reference: str) -> float | None:
     try:
         from deepeval.metrics import GEval
         from deepeval.models import DeepEvalBaseLLM
-        from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+        from deepeval.test_case import LLMTestCase
         from langchain_anthropic import ChatAnthropic
+
+        try:  # deepeval >= 4.1 renamed this; keep working on the >=1.0 floor
+            from deepeval.test_case import SingleTurnParams as _TestCaseParams
+        except ImportError:
+            from deepeval.test_case import LLMTestCaseParams as _TestCaseParams
 
         class ClaudeJudge(DeepEvalBaseLLM):
             def __init__(self):
@@ -58,7 +64,7 @@ def score_root_cause(actual_reasoning: str, reference: str) -> float | None:
         metric = GEval(
             name="RootCauseReasoning",
             model=ClaudeJudge(),
-            evaluation_params=[LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
+            evaluation_params=[_TestCaseParams.ACTUAL_OUTPUT, _TestCaseParams.EXPECTED_OUTPUT],
             evaluation_steps=[
                 "Does the actual reasoning identify the same underlying mechanism as the reference?",
                 "Is the reasoning grounded in the incident evidence rather than generic?",
