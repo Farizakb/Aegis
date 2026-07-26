@@ -11,6 +11,15 @@ from __future__ import annotations
 import pandas as pd
 import streamlit as st
 
+from dashboard.evals_data import (
+    EvalRun,
+    headline_scorecard,
+    latest_per_tier,
+    load_eval_runs,
+    metric_series,
+    tiering_deltas,
+    tiering_table,
+)
 from dashboard.operations_data import (
     IncidentRow,
     expired_approvals,
@@ -28,6 +37,11 @@ OUTCOMES = ("applied", "rejected", "blocked", "escalated")
 @st.cache_data(ttl=CACHE_TTL_S, show_spinner=False)
 def _incident_rows() -> list[IncidentRow]:
     return fetch_incident_rows()
+
+
+@st.cache_data(ttl=CACHE_TTL_S, show_spinner=False)
+def _eval_runs() -> list[EvalRun]:
+    return load_eval_runs()
 
 
 def _render_operations() -> None:
@@ -104,8 +118,70 @@ def _render_operations() -> None:
         st.caption("No per-node usage recorded yet — reports written before Phase 7 have none.")
 
 
+def _format_metric(metric: str, value: float | None) -> str:
+    if value is None:
+        return "--"
+    # geval_mean is a 0-1 rubric score, not a rate: this judge tops out near 0.7, so
+    # rendering it as a percentage would read as "60% wrong", which is false.
+    if metric == "geval_mean":
+        return f"{value:.2f} / 1.00"
+    return f"{value:.0%}"
+
+
 def _render_evaluation() -> None:
-    st.info("Evaluation tab lands in the next task.")
+    runs = _eval_runs()
+    if not runs:
+        st.info("No eval results yet.")
+        st.caption("Produce some with `python evals/run_evals.py --tier 1`.")
+        return
+
+    latest = latest_per_tier(runs)
+    cards = headline_scorecard(latest)
+
+    st.subheader("Headline metrics — latest run")
+    for start in range(0, len(cards), 3):
+        for column, card in zip(st.columns(3), cards[start:start + 3]):
+            column.metric(card["label"], _format_metric(card["metric"], card["value"]))
+            column.caption(
+                f"tier {card['tier']} - {card['run_at'] or 'not run'}"
+                + (f" @ {card['code_git_sha']}" if card["code_git_sha"] else "")
+            )
+    st.caption(
+        "Five headline metrics plus the G-Eval reasoning rubric. `mean_confidence`, "
+        "`pct_below_confidence_floor` and `durable_fix_valid_path_rate` are also recorded "
+        "as diagnostics, but are not headline claims."
+    )
+
+    st.subheader("Run-over-run trend")
+    choices = {card["label"]: (card["tier"], card["metric"]) for card in cards}
+    label = st.selectbox("Metric", list(choices))
+    tier, metric = choices[label]
+    series = metric_series(runs, tier, metric)
+    if len(series) >= 2:
+        st.line_chart(pd.DataFrame(series).set_index("run_at")["value"])
+    elif len(series) == 1:
+        st.caption(
+            f"One run so far ({series[0]['run_at']}): {_format_metric(metric, series[0]['value'])}. "
+            "The trend line appears once this tier has been run more than once."
+        )
+    else:
+        st.caption("Not recorded yet in any run.")
+
+    tiering = latest.get("model-tiering")
+    if tiering is not None:
+        st.subheader("Model tiering — cost vs accuracy")
+        table = pd.DataFrame(tiering_table(tiering)).set_index("config")
+        st.dataframe(table)
+        st.bar_chart(table["total_cost_usd"])
+        deltas = tiering_deltas(tiering)
+        if deltas:
+            st.dataframe(pd.DataFrame(deltas))
+        st.caption(
+            "Cost is deterministic and reproducible — it is the headline. Single-run accuracy "
+            "deltas over 18 cases are sampling noise, and action-selection accuracy is coarse "
+            "set membership: it does not measure patch-draft or root-cause quality, which is "
+            "why the strong model stays on the propose node."
+        )
 
 
 def main() -> None:
