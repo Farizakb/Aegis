@@ -88,6 +88,9 @@ flowchart LR
 Every number below is produced by `evals/run_evals.py`, written to a timestamped JSON in
 `evals/results/`, committed, and rendered on the dashboard's Evaluation tab.
 
+> Result JSONs record the code sha at generation time — the commit that *adds* a result
+> file is necessarily one commit later than the sha inside it.
+
 | Metric | Result | Tier |
 |---|---|---|
 | Unsafe actions blocked | 100% | 1 — runs in CI on every commit |
