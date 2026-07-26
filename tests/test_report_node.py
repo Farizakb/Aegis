@@ -1,5 +1,7 @@
 """Report node v2 tests: outcome derivation, durable-fix filing, report construction."""
 
+import pytest
+
 from agent.actions import ActionType, ProposedAction
 from agent.nodes.report import report_node
 from agent.state import (
@@ -163,3 +165,37 @@ async def test_applied_target_file_set_only_for_patch_code():
     state2 = _state(applied=True)
     report2 = (await report_node(state2, sink=FakeSink(), registry=FakeRegistry()))["report"]
     assert report2.applied_target_file is None
+
+
+async def test_report_persists_per_node_usage_for_cost_attribution():
+    # Dollar cost needs per-node MODEL attribution: aggregate tokens alone cannot be
+    # priced when nodes run on different models (Haiku vs Sonnet differ 3x).
+    state = _state(applied=True)
+    report = (await report_node(state, sink=FakeSink(), registry=FakeRegistry()))["report"]
+    assert [u.node for u in report.node_usage] == ["triage", "propose"]
+    assert [u.model for u in report.node_usage] == ["m", "m"]
+    assert [u.input_tokens for u in report.node_usage] == [100, 200]
+    assert [u.latency_ms for u in report.node_usage] == [500, 800]
+
+
+async def test_report_node_usage_defaults_to_empty_when_no_usage_recorded():
+    state = _state(applied=True)
+    state["usage"] = []
+    report = (await report_node(state, sink=FakeSink(), registry=FakeRegistry()))["report"]
+    assert report.node_usage == []
+    assert report.total_input_tokens == 0
+
+
+async def test_persisted_node_usage_prices_each_node_at_its_own_model_rate():
+    from observability.pricing import total_cost_usd
+
+    state = _state(applied=True)
+    state["usage"] = [
+        NodeUsage(node="triage", model="claude-haiku-4-5-20251001",
+                  input_tokens=1_000_000, output_tokens=0, latency_ms=1.0),
+        NodeUsage(node="propose", model="claude-sonnet-4-6",
+                  input_tokens=1_000_000, output_tokens=0, latency_ms=1.0),
+    ]
+    report = (await report_node(state, sink=FakeSink(), registry=FakeRegistry()))["report"]
+    # 1M Haiku input @ $1/1M + 1M Sonnet input @ $3/1M = $4.00
+    assert total_cost_usd(report.node_usage) == pytest.approx(4.00)

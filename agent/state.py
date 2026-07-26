@@ -101,6 +101,9 @@ class IncidentReport(BaseModel):
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_latency_ms: float = 0.0
+    # Per-node usage retained so the dashboard can price each node's tokens against
+    # the model that produced them (aggregate tokens alone are not priceable).
+    node_usage: list[NodeUsage] = Field(default_factory=list)
 
 
 class AgentState(TypedDict):
