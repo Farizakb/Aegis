@@ -28,6 +28,7 @@ COPY apply ./apply
 COPY hitl ./hitl
 COPY evals ./evals
 COPY observability ./observability
+COPY dashboard ./dashboard
 RUN pip install --no-cache-dir --no-deps .[dev]
 
 RUN git config --global user.email "sandbox@aegis.local" \
