@@ -32,6 +32,10 @@ dev = [
 eval = [
     "deepeval>=1.0",
 ]
+dashboard = [
+    "streamlit>=1.36",
+    "pandas>=2.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
