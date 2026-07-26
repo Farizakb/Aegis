@@ -129,7 +129,13 @@ def _format_metric(metric: str, value: float | None) -> str:
 
 
 def _render_evaluation() -> None:
-    runs = _eval_runs()
+    try:
+        runs = _eval_runs()
+    except Exception as exc:  # corrupt/unreadable result JSON: explain, never traceback
+        st.error(f"Cannot read eval results from evals/results/: {exc}")
+        st.caption("Check for a malformed result JSON, then hit Refresh.")
+        return
+
     if not runs:
         st.info("No eval results yet.")
         st.caption("Produce some with `python evals/run_evals.py --tier 1`.")
