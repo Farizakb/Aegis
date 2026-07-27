@@ -36,7 +36,10 @@ async def report_node(state: AgentState, sink, registry) -> dict:
     durable_fix = plan.durable_fix if plan else None
 
     outcome = _determine_outcome(state)
-    if durable_fix is not None and outcome is Outcome.applied:
+    usage = state.get("usage", [])
+    # File the durable fix regardless of terminal outcome (§5 "open durable fixes"):
+    # a rejected/blocked/escalated incident still has an unfixed root cause worth ticketing.
+    if durable_fix is not None:
         registry.file(incident=incident, triage=triage, fix=durable_fix)
 
     applied_target_file = (
@@ -58,9 +61,10 @@ async def report_node(state: AgentState, sink, registry) -> dict:
         hitl_choice=hitl.choice if hitl else None,
         apply_error=state.get("apply_error"),
         applied_target_file=applied_target_file,
-        total_input_tokens=sum(u.input_tokens for u in state.get("usage", [])),
-        total_output_tokens=sum(u.output_tokens for u in state.get("usage", [])),
-        total_latency_ms=sum(u.latency_ms for u in state.get("usage", [])),
+        total_input_tokens=sum(u.input_tokens for u in usage),
+        total_output_tokens=sum(u.output_tokens for u in usage),
+        total_latency_ms=sum(u.latency_ms for u in usage),
+        node_usage=list(usage),
     )
     sink.emit(report)
     trace.get_current_span().set_attribute("report.outcome", report.outcome.value)

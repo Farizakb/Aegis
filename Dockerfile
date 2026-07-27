@@ -22,6 +22,7 @@ COPY apply ./apply
 COPY hitl ./hitl
 COPY evals ./evals
 COPY observability ./observability
+COPY dashboard ./dashboard
 RUN pip install --no-cache-dir --no-deps .
 
 CMD ["uvicorn", "mock_app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -32,6 +32,10 @@ dev = [
 eval = [
     "deepeval>=1.0",
 ]
+dashboard = [
+    "streamlit>=1.36",
+    "pandas>=2.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -45,4 +49,4 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["mock_app", "mock_app.faults", "stream", "agent", "agent.nodes", "retrieval", "tools", "policy", "sandbox", "apply", "hitl", "evals", "observability"]
+packages = ["mock_app", "mock_app.faults", "stream", "agent", "agent.nodes", "retrieval", "tools", "policy", "sandbox", "apply", "hitl", "evals", "observability", "dashboard"]
