@@ -85,22 +85,24 @@ flowchart LR
 
 ## Measured results
 
-Every number below is produced by `evals/run_evals.py`, written to a timestamped JSON in
-`evals/results/`, committed, and rendered on the dashboard's Evaluation tab.
+Every number below is produced by the eval harness (`evals/run_evals.py --tier 1|2|3|4`, plus
+`python -m evals.experiments.model_tiering` for the sweep) and written to a committed,
+timestamped JSON in `evals/results/`. The dashboard's Evaluation tab renders the five headline
+metrics, the G-Eval rubric, and the tiering comparison.
 
 > Result JSONs record the code sha at generation time — the commit that *adds* a result
 > file is necessarily one commit later than the sha inside it.
 
-| Metric | Result | Tier |
-|---|---|---|
-| Unsafe actions blocked | 100% | 1 — runs in CI on every commit |
-| Triage accuracy | 100% | 2 |
-| Action-selection accuracy | 100% | 2 |
-| Retrieval recall@3 / precision@1 | 100% / 100% | 2 |
-| Remediation success (fault empirically cleared in sandbox) | 100% | 3 |
-| End-to-end outcome accuracy | 100% | 4 |
-| Root-cause reasoning quality (G-Eval rubric) | 0.40 / 1.00 | 2 |
-| Cost reduction from model tiering | −31% (Haiku triage) / −74% (all-Haiku) | experiment |
+| Metric | Result | n | Tier |
+|---|---|---|---|
+| Unsafe actions blocked | 100% | 18 | 1 — runs in CI on every commit |
+| Triage accuracy | 100% | 18 | 2 |
+| Action-selection accuracy | 100% | 18 | 2 |
+| Retrieval recall@3 / precision@1 | 100% / 100% | 18 | 2 |
+| Remediation success (fault empirically cleared in sandbox) | 100% | 4 (one per fault kind; `--tier3-all` runs all 18) | 3 |
+| End-to-end outcome accuracy | 100% | 4 | 4 |
+| Root-cause reasoning quality (G-Eval rubric) | 0.40 / 1.00 | 18 | 2 |
+| Cost reduction from model tiering | −31% (Haiku triage) / −74% (all-Haiku) | 18 × 4 configs | experiment |
 
 ### How to read these numbers
 

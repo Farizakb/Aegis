@@ -12,6 +12,7 @@ import pandas as pd
 import streamlit as st
 
 from dashboard.evals_data import (
+    FUZZY_METRIC,
     EvalRun,
     headline_scorecard,
     latest_per_tier,
@@ -123,7 +124,7 @@ def _format_metric(metric: str, value: float | None) -> str:
         return "--"
     # geval_mean is a 0-1 rubric score, not a rate: this judge tops out near 0.7, so
     # rendering it as a percentage would read as "60% wrong", which is false.
-    if metric == "geval_mean":
+    if metric == FUZZY_METRIC[2]:
         return f"{value:.2f} / 1.00"
     return f"{value:.0%}"
 
