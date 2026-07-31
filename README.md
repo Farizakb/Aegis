@@ -168,16 +168,32 @@ computed over live, non-deterministic LLM runs, so small run-to-run variation is
 Requires Docker Desktop and Python 3.11+.
 
 ```bash
-# 1. Bring up the stack (target app, Redis, Postgres/pgvector, Jaeger)
+# 1. Install Aegis and its dependencies into a virtualenv.
+#    Every `python` below must be this venv's interpreter.
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+pip install -e .
+
+# 2. Bring up the stack (target app, Redis, Postgres/pgvector, Jaeger)
 docker compose up -d redis postgres app consumer jaeger
 
-# 2. Seed the retrieval corpus (runbooks + git history)
+# 3. Seed the retrieval corpus (runbooks + git history)
 python -m retrieval.ingest
 
-# 3. Trigger a fault, then run the agent against the latest incident
+# 4. Trigger a fault, then run the agent against the latest incident
 #    (the agent runs on the host; the HITL UI serves at http://localhost:8001)
 python -m agent.main --count 1
 ```
+
+> **Don't skip step 1.** The agent, the ingest job, and the retrieval MCP server all run on
+> the *host*, so they need the package installed locally — `python -m retrieval.ingest` on a
+> bare interpreter fails at `ModuleNotFoundError: No module named 'pgvector'`. If a `python`
+> command errors that way, you are outside the venv.
+
+Note that "pgvector" means two different things here, and only one is yours to install: the
+**`pgvector` Python client** is a core dependency installed by step 1, while the **Postgres
+`vector` extension** ships inside the `pgvector/pgvector:pg16` compose image and is created
+automatically on first connect — no manual `CREATE EXTENSION` needed.
 
 Set `ANTHROPIC_API_KEY` in a `.env` file first (the agent loads it on startup).
 The **Jaeger UI** (one trace-waterfall per incident) serves at http://localhost:16686;
@@ -200,7 +216,7 @@ The **Jaeger UI** (one trace-waterfall per incident) serves at http://localhost:
 ### Dashboard
 
 ```bash
-pip install -e ".[dashboard]"
+pip install -e ".[dashboard]"      # adds Streamlit + pandas to the step-1 install
 streamlit run dashboard/app.py     # http://localhost:8501
 ```
 
