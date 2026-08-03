@@ -11,6 +11,7 @@ import functools
 import logging
 import os
 
+import structlog
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.propagate import extract, inject, set_global_textmap
@@ -21,6 +22,7 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 
 DEFAULT_OTLP_ENDPOINT = "http://localhost:4318"
 _provider: TracerProvider | None = None
+logger = structlog.get_logger("aegis.agent")
 
 
 def setup_tracing(service_name: str) -> TracerProvider:
@@ -66,7 +68,13 @@ def current_trace_id() -> str | None:
 
 
 def traced(span_name: str):
-    """Wrap an async graph node in a span, stamping incident_id/fault_kind."""
+    """Wrap an async graph node in a span, stamping incident_id/fault_kind.
+
+    Also emits one structlog line per node as it starts, so the incident
+    lifecycle is readable in the terminal and cross-references the trace by
+    trace_id (spec section 11). Logged on entry rather than completion so the
+    trail advances live through slow nodes such as sandbox verification.
+    """
 
     def decorator(func):
         @functools.wraps(func)
@@ -76,6 +84,13 @@ def traced(span_name: str):
                 if incident is not None:
                     span.set_attribute("incident_id", incident.incident_id)
                     span.set_attribute("fault_kind", incident.fault_kind.value)
+                    logger.info(
+                        span_name,
+                        incident_id=incident.incident_id,
+                        fault_kind=incident.fault_kind.value,
+                    )
+                else:
+                    logger.info(span_name)
                 return await func(state, *args, **kwargs)
 
         return wrapper
