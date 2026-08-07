@@ -1,4 +1,14 @@
-﻿
+﻿Captured output of `python -m sandbox.demo --matrix` (Phase-2 checkpoint, ADR-0002).
+Each row replays a fault in a disposable container, applies an action, and asserts
+recovery on app-reported metrics only. The 5 FAIL rows are expected failures: they are
+the truth matrix's wrong answers, proving the sandbox rejects actions that don't work.
+
+`after: {}` on a PASS is not a missing reading -- the fault stopped reporting its metric
+entirely, i.e. it is no longer active. See sandbox/recovery.py: "absent metric = fault
+inactive = 0.0", which is the strongest recovery signal available.
+
+--- verbatim output below ---
+
 === memory_leak + restart_service: PASS (7.6s)
   before: {'rss_mb': 90.0}
   after:  {}

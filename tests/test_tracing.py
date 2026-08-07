@@ -45,3 +45,34 @@ async def test_traced_decorator_opens_span_with_incident_attrs(span_exporter):
     assert spans[0].name == "graph.demo"
     assert spans[0].attributes["incident_id"] == "inc-1"
     assert spans[0].attributes["fault_kind"] == "memory_leak"
+
+
+async def test_traced_decorator_logs_the_node_with_incident_context(span_exporter):
+    """Each traced node emits one log line, so the lifecycle is visible in the
+    terminal and cross-references the trace (spec section 11)."""
+    import structlog
+
+    @tracing.traced("graph.demo")
+    async def node(state):
+        return {"ok": True}
+
+    with structlog.testing.capture_logs() as logs:
+        await node({"incident": _Incident()})
+
+    assert [entry["event"] for entry in logs] == ["graph.demo"]
+    assert logs[0]["incident_id"] == "inc-1"
+    assert logs[0]["fault_kind"] == "memory_leak"
+
+
+async def test_traced_decorator_logs_even_without_an_incident(span_exporter):
+    import structlog
+
+    @tracing.traced("graph.demo")
+    async def node(state):
+        return {"ok": True}
+
+    with structlog.testing.capture_logs() as logs:
+        await node({})
+
+    assert [entry["event"] for entry in logs] == ["graph.demo"]
+    assert "incident_id" not in logs[0]

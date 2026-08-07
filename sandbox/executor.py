@@ -39,9 +39,6 @@ class SandboxExecutor:
         self._timeout_s = timeout_s
         self._app_image = app_image
 
-    async def run(self, *, patch: str, target_file: str) -> SandboxResult:
-        return await asyncio.to_thread(self._run_sync, patch, target_file)
-
     def _run_sync(self, patch: str, target_file: str) -> SandboxResult:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".diff", delete=False,
                                          encoding="utf-8", newline="") as f:
