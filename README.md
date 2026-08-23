@@ -151,18 +151,6 @@ computed over live, non-deterministic LLM runs, so small run-to-run variation is
 | HITL | Local FastAPI web UI |
 | Tests | pytest |
 
-## Status
-
-| Phase | Scope | State |
-|---|---|---|
-| 1 | Typed contracts + mock-app faults | ✅ Done |
-| 2 | Sandbox fault-replay | ✅ Done |
-| 3 | Policy engine + tier-1 evals in CI | ✅ Done |
-| 4 | Agent nodes, reflective retry, live appliers, HITL, reports | ✅ Done |
-| 5 | Observability (OpenTelemetry + Jaeger + structlog + LangSmith) | ✅ Done |
-| 6 | Eval pyramid + model-tiering experiment | ✅ Done |
-| 7 | Streamlit dashboard + writeup | ✅ Done |
-
 ## Running it
 
 Requires Docker Desktop and Python 3.11+.
