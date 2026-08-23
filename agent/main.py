@@ -59,7 +59,10 @@ def promoted_incident(incident: IncidentEvent) -> IncidentEvent:
 async def main(count: int = 1) -> None:
     setup_logging()
     setup_tracing("aegis-agent")
-    print(f"LangSmith tracing: {'enabled' if setup_langsmith() else 'disabled'}")
+    # Announce only when it's on. LangSmith is optional and off by default, so
+    # printing "disabled" on every run reads like a fault rather than a default.
+    if setup_langsmith():
+        print("LangSmith tracing: enabled")
 
     redis = Redis.from_url(REDIS_URL, decode_responses=True)
     try:
