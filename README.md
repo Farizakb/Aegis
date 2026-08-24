@@ -10,7 +10,11 @@ It is built to demonstrate production-grade agent infrastructure rather than a c
 real async ingestion, empirical verification of LLM proposals, auditable guardrails, and
 human-in-the-loop safety.
 
-![Aegis: the approval brief showing sandbox before/after evidence and the policy verdict, beside the agent's per-node log stream](assets/demo.gif)
+[![Aegis: the approval brief showing sandbox before/after evidence and the policy verdict, beside the agent's per-node log stream](assets/demo.gif)](https://youtu.be/tfdV5Zf0fP0)
+
+**▶ [Watch the 5-minute walkthrough](https://youtu.be/tfdV5Zf0fP0)** — one incident end to end:
+event stream, sandbox verification, policy gate, human approval, applied fix, and the traces
+and eval numbers behind it.
 
 *Above: the agent has replayed a `traffic_surge` incident in a disposable container and proved
 `scale_out` clears it (`latency_ms` 200 → 25). Triage confidence came in at 0.65, below the 0.7
