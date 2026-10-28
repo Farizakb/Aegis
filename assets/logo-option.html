@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Aegis — logo options</title>
+<style>
+  :root { --accent:#14B8A6; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.55 Inter,"Segoe UI",system-ui,sans-serif; }
+  section { padding:36px 32px; }
+  .light { background:#ffffff; color:#0f172a; }
+  .dark  { background:#0B1220; color:#e2e8f0; }
+  h1 { font-size:20px; margin:0 0 4px; letter-spacing:-.01em; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.12em;
+       opacity:.55; margin:0 0 24px; font-weight:600; }
+  .row { display:flex; align-items:center; gap:28px; padding:18px 0;
+         border-bottom:1px solid currentColor; border-color:rgba(128,128,128,.22); }
+  .row:last-child { border-bottom:0; }
+  .meta { width:230px; flex:none; }
+  .meta b { display:block; font-size:15px; margin-bottom:2px; }
+  .meta span { font-size:13px; opacity:.6; }
+  .sizes { display:flex; align-items:center; gap:26px; }
+  .sizes figure { margin:0; text-align:center; }
+  .sizes figcaption { font-size:11px; opacity:.45; margin-top:6px; }
+  .wordmark { margin-top:8px; }
+</style>
+</head>
+<body>
+
+<!-- ============ reusable defs ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <path id="shield" d="M32 5 L55 13 V32 C55 45.5 45 55.5 32 59.5 C19 55.5 9 45.5 9 32 V13 Z"/>
+
+    <g id="optA">
+      <use href="#shield" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M18 25 H27 L35 42 H46" fill="none" stroke="var(--accent)" stroke-width="4.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <g id="optB">
+      <use href="#shield" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M15 35 L19 26 L23 39 L27 28 L31 35" fill="none" stroke="currentColor"
+            stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+      <path d="M32 20 V47" stroke="currentColor" stroke-width="1.5" opacity=".3"/>
+      <path d="M34 35 H49" fill="none" stroke="var(--accent)" stroke-width="4.5"
+            stroke-linecap="round"/>
+    </g>
+
+    <g id="optC">
+      <use href="#shield" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M32 21 A11 11 0 1 1 21 32" fill="none" stroke="var(--accent)" stroke-width="4.5"
+            stroke-linecap="round"/>
+      <path d="M27 16 L36 21 L27 26 Z" fill="var(--accent)"/>
+    </g>
+
+    <g id="optD">
+      <use href="#shield" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <g fill="none" stroke="var(--accent)" stroke-width="3.4" stroke-linejoin="round">
+        <path d="M32 19 L43 25.5 L32 32 L21 25.5 Z"/>
+        <path d="M21 25.5 V38 L32 44.5 V32"/>
+        <path d="M43 25.5 V38 L32 44.5"/>
+      </g>
+    </g>
+
+    <g id="optE">
+      <use href="#shield" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M23 45 L32 19 L41 45" fill="none" stroke="currentColor" stroke-width="4"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M26.5 36 H37.5" fill="none" stroke="var(--accent)" stroke-width="4.5"
+            stroke-linecap="round"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- ============ template ============ -->
+<script>
+const OPTS = [
+  ["A","Recovery curve","Degraded plateau, drop, restored. The metric it fixes."],
+  ["B","Before / after","Chaos on the left, flat on the right. The proof, literally."],
+  ["C","Replay loop","The sandbox replaying the incident before acting."],
+  ["D","Sandbox cube","The disposable container the fault is proven in."],
+  ["E","Monogram A","Classic. Crossbar is the recovery line."],
+];
+function render(theme){
+  return `<section class="${theme}">
+    <h1>Aegis — logo options</h1>
+    <h2>${theme} background</h2>
+    ${OPTS.map(([k,name,desc])=>`
+      <div class="row">
+        <div class="meta"><b>${k}. ${name}</b><span>${desc}</span></div>
+        <div class="sizes">
+          ${[96,48,24].map(s=>`<figure>
+            <svg viewBox="0 0 64 64" width="${s}" height="${s}"><use href="#opt${k}"/></svg>
+            <figcaption>${s}px</figcaption></figure>`).join("")}
+          <figure class="wordmark">
+            <svg viewBox="0 0 250 64" width="200" height="51">
+              <use href="#opt${k}"/>
+              <text x="72" y="42" fill="currentColor" font-family="Inter,'Segoe UI',system-ui,sans-serif"
+                    font-size="29" font-weight="600" letter-spacing="6">AEGIS</text>
+            </svg>
+            <figcaption>wordmark</figcaption></figure>
+        </div>
+      </div>`).join("")}
+  </section>`;
+}
+document.body.insertAdjacentHTML("beforeend", render("light") + render("dark"));
+</script>
+
+</body>
+</html>
